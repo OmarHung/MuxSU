@@ -7,6 +7,7 @@
       "productCode": "3CF0",
       "productName": "MPG 274U E16M",
       "serialNumber": null,
+      "serialField": null,
       "serialSource": "macOS reads no serial from this display",
       "observedResolution": "3840x2160",
       "observedOn": "macOS",
@@ -21,6 +22,7 @@
       "productCode": "7CF0",
       "productName": "MPG 274U E16M",
       "serialNumber": null,
+      "serialField": null,
       "serialSource": "macOS reads no serial from this display in either mode",
       "observedResolution": "1920x1080",
       "observedOn": "macOS",
@@ -32,6 +34,7 @@
       "productCode": "0725",
       "productName": "VG252Q",
       "serialNumber": "576726074",
+      "serialField": "edidNumericSerial",
       "serialSource": "EDID 32-bit numeric serial, as macOS reads it",
       "observedResolution": "1920x1080",
       "observedOn": "macOS",
@@ -46,6 +49,7 @@
       "productCode": "2402",
       "productName": "24B2HM2",
       "serialNumber": "1GAQ1HA000232",
+      "serialField": "edidSerialText",
       "serialSource": "EDID serial-text descriptor, as Windows WMI SerialNumberID reads it",
       "observedResolution": "1920x1080",
       "observedOn": "captured EDID",
@@ -57,10 +61,57 @@
       "productCode": "2402",
       "productName": "24B2W1",
       "serialNumber": "2885",
+      "serialField": "edidNumericSerial",
       "serialSource": "EDID 32-bit numeric serial; this EDID carries no serial-text descriptor",
       "observedResolution": "1920x1080",
       "observedOn": "captured EDID",
       "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2W1_HDMI"
+    },
+    {
+      "id": "acr-0725-th6tt0028525",
+      "manufacturerId": "ACR",
+      "productCode": "0725",
+      "productName": "VG252Q",
+      "serialNumber": "TH6TT0028525",
+      "serialField": "edidSerialText",
+      "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+      "observedResolution": "1920x1080",
+      "observedOn": "Windows",
+      "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+      "observedAlongside": [
+        "msi-3cf0-cf0h246200009",
+        "msi-7cf0-cf0h246200009"
+      ]
+    },
+    {
+      "id": "msi-3cf0-cf0h246200009",
+      "manufacturerId": "MSI",
+      "productCode": "3CF0",
+      "productName": "MPG 274U E16M",
+      "serialNumber": "CF0H246200009",
+      "serialField": "edidSerialText",
+      "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+      "observedResolution": "3840x2160",
+      "observedOn": "Windows",
+      "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+      "observedAlongside": [
+        "acr-0725-th6tt0028525"
+      ]
+    },
+    {
+      "id": "msi-7cf0-cf0h246200009",
+      "manufacturerId": "MSI",
+      "productCode": "7CF0",
+      "productName": "MPG 274U E16M",
+      "serialNumber": "CF0H246200009",
+      "serialField": "edidSerialText",
+      "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+      "observedResolution": "1920x1080",
+      "observedOn": "Windows",
+      "provenance": "Windows 11, MSI MPG 274U at 1920x1080",
+      "observedAlongside": [
+        "acr-0725-th6tt0028525"
+      ]
     }
   ]
 }

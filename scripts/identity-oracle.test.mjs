@@ -45,11 +45,43 @@ test("an absent serial number is unknown rather than a difference", () => {
   assert.equal(sameIdentity(withoutSerial, { ...withoutSerial, productCode: "7CF0" }), false);
 });
 
-test("two serials that both exist and differ are settled in code, not by the model", () => {
-  const settled = settleLocally(identity("aoc-24b2hm2"), identity("aoc-24b2w1"));
+test("two serials from the same EDID field that differ are settled in code, not by the model", () => {
+  const settled = settleLocally(identity("acr-0725-th6tt0028525"), identity("msi-3cf0-cf0h246200009"));
 
   assert.equal(settled?.outcome, "different");
-  assert.match(settled.reason, /serial number/);
+  assert.match(settled.reason, /same EDID field/);
+});
+
+/** One ASUS VG252Q shared between these two computers reads as `TH6TT0028525`
+ *  on Windows and `576726074` on macOS, because Windows reports the EDID's
+ *  serial-text descriptor and macOS its 32-bit numeric serial. Comparing those
+ *  concluded one display was two. */
+test("serials from different EDID fields are not compared at all", () => {
+  const macOs = identity("asus-vg252q");
+  const windows = identity("acr-0725-th6tt0028525");
+
+  assert.notEqual(macOs.serialNumber, windows.serialNumber);
+  assert.notEqual(macOs.serialField, windows.serialField);
+  assert.equal(settleLocally(macOs, windows), null, "this pair has to reach the model");
+
+  const state = stateFor(macOs, windows);
+  assert.match(state.howTheseWereRead, /different EDID fields/);
+  assert.match(state.howTheseWereRead, /says nothing about whether these are one display or two/);
+});
+
+test("the same field on both sides is said to be comparable", () => {
+  const state = stateFor(identity("msi-3cf0-cf0h246200009"), identity("msi-7cf0-cf0h246200009"));
+
+  assert.match(state.howTheseWereRead, /same EDID field, so they can be compared directly/);
+  assert.equal(state.displayA.serialNumberRead, state.displayB.serialNumberRead);
+  assert.match(state.displayA.whichSerialFieldThatCameFrom, /WMI SerialNumberID/);
+});
+
+test("an identity with no serial says nothing about serial fields", () => {
+  const state = stateFor(identity("msi-mpg274u-uhd"), identity("msi-mpg274u-fhd"));
+
+  assert.equal(state.displayA.whichSerialFieldThatCameFrom, null);
+  assert.ok(!state.howTheseWereRead.includes("EDID field"));
 });
 
 test("two identities one scan listed together are settled in code as two panels", () => {
@@ -73,10 +105,11 @@ test("the two display modes of one panel are left for the model to judge", () =>
   const isMsiModePair = (pair) =>
     [pair.left.id, pair.right.id].sort().join("|") === "msi-mpg274u-fhd|msi-mpg274u-uhd";
 
+  const count = corpus.identities.length;
   assert.ok(open.some(isMsiModePair), "MSI:3CF0 vs MSI:7CF0 must reach the model");
   assert.ok(!settled.some(isMsiModePair));
-  assert.equal(settled.length + open.length, 10, "every unordered pair of five identities is accounted for");
-  assert.equal(settled.length, 4, "the serial and one-scan rules settle four of the ten pairs");
+  assert.equal(settled.length + open.length, (count * (count - 1)) / 2, "every unordered pair is accounted for");
+  assert.ok(settled.length > 0 && open.length > 0, "both paths are exercised by the real corpus");
 });
 
 test("state carries the evidence a judgment needs and no internal ids", () => {
@@ -109,9 +142,39 @@ test("the nouls ride along as reasons", () => {
   assert.equal(routed.reasons.sameProductLine, 0.97);
 });
 
-/** One `muxsu-cli list --json` scan: the MSI set to 1080p next to the ASUS, as
- *  Windows reports them — MonitorDescriptor in camelCase, its fingerprint in
- *  snake_case, and Windows reading the serial macOS cannot. */
+/** A fixed two-entry corpus, so importing is tested against something that does
+ *  not move as the real corpus grows. These are what macOS read of the two
+ *  displays it shares with the Windows machine. */
+const seedCorpus = {
+  identities: [
+    {
+      id: "msi-mpg274u-uhd",
+      manufacturerId: "MSI",
+      productCode: "3CF0",
+      productName: "MPG 274U E16M",
+      serialNumber: null,
+      serialField: null,
+      observedResolution: "3840x2160",
+      observedOn: "macOS",
+      observedAlongside: ["asus-vg252q"],
+    },
+    {
+      id: "asus-vg252q",
+      manufacturerId: "ACR",
+      productCode: "0725",
+      productName: "VG252Q",
+      serialNumber: "576726074",
+      serialField: "edidNumericSerial",
+      observedResolution: "1920x1080",
+      observedOn: "macOS",
+      observedAlongside: ["msi-mpg274u-uhd"],
+    },
+  ],
+};
+
+/** One `muxsu-cli list --json` scan of the same two displays from Windows, with
+ *  the MSI set to 1080p — MonitorDescriptor in camelCase, its fingerprint in
+ *  snake_case, and Windows reading serials from the EDID field macOS does not. */
 const windowsScan = [
   {
     id: "windows:\\\\?\\DISPLAY#MSI7CF0#5&1234#0",
@@ -124,7 +187,7 @@ const windowsScan = [
   {
     id: "windows:\\\\?\\DISPLAY#ACR0725#5&5678#0",
     name: "VG252Q",
-    fingerprint: { manufacturer_id: "ACR", product_code: "0725", serial_number: "576726074" },
+    fingerprint: { manufacturer_id: "ACR", product_code: "0725", serial_number: "TH6TT0028525" },
     active: true,
     builtIn: false,
     maxResolution: { width: 1920, height: 1080 },
@@ -139,47 +202,50 @@ const windowsScan = [
   },
 ];
 
-test("a scan adds the identities a host reads and skips its built-in panel", () => {
-  const imported = importScan(corpus, windowsScan, "Windows 11 desktop, MSI set to 1920x1080");
+test("a scan adds what a host read and skips its built-in panel", () => {
+  const imported = importScan(seedCorpus, windowsScan, "Windows 11 desktop, MSI set to 1920x1080");
 
   assert.equal(imported.platform, "Windows");
   assert.equal(imported.scanned, 2, "the built-in panel is not corpus material");
-  assert.equal(imported.added, 1, "only the MSI identity Windows reads a serial for is new");
   const added = imported.corpus.identities.find((entry) => entry.serialNumber === "CF0H246200009");
   assert.equal(added.productCode, "7CF0");
   assert.equal(added.observedResolution, "1920x1080");
   assert.equal(added.observedOn, "Windows");
-  assert.match(added.serialSource, /WMI SerialNumberID/);
+  assert.equal(added.serialField, "edidSerialText");
   assert.equal(added.provenance, "Windows 11 desktop, MSI set to 1920x1080");
   assert.ok(!imported.corpus.identities.some((entry) => entry.manufacturerId === "BOE"));
 });
 
-/** macOS reads no serial from the MSI and Windows reads one, so the two
- *  observations are separate entries. Collapsing them would throw away the
- *  serial that makes the pair judgeable. */
-test("a host that reads a serial gets its own entry rather than overwriting one that cannot", () => {
-  const imported = importScan(corpus, windowsScan, "note");
-  const msiEntries = imported.corpus.identities.filter((entry) => entry.manufacturerId === "MSI");
+/** The two hosts read different EDID fields, so one shared panel arrives under
+ *  two serials. Both observations are kept: collapsing them would throw away
+ *  which host read what, and that is what says whether two serials can be
+ *  compared at all. */
+test("a host reading a different serial field gets its own entry", () => {
+  const imported = importScan(seedCorpus, windowsScan, "note");
+  const asus = imported.corpus.identities.filter((entry) => entry.manufacturerId === "ACR");
 
+  assert.equal(imported.added, 2, "both of the Windows readings are new");
   assert.deepEqual(
-    msiEntries.map((entry) => `${entry.productCode}/${entry.serialNumber ?? "none"}`).sort(),
-    ["3CF0/none", "7CF0/CF0H246200009", "7CF0/none"],
+    asus.map((entry) => `${entry.serialNumber}/${entry.serialField}`),
+    ["576726074/edidNumericSerial", "TH6TT0028525/edidSerialText"],
   );
+  assert.equal(settleLocally(asus[0], asus[1]), null, "one panel must not be settled as two");
 });
 
 test("everything one scan listed is recorded as seen together", () => {
-  const imported = importScan(corpus, windowsScan, "note");
+  const imported = importScan(seedCorpus, windowsScan, "note");
   const msi = imported.corpus.identities.find((entry) => entry.serialNumber === "CF0H246200009");
-  const asus = imported.corpus.identities.find((entry) => entry.id === "asus-vg252q");
+  const asus = imported.corpus.identities.find((entry) => entry.serialNumber === "TH6TT0028525");
+  const macOsAsus = imported.corpus.identities.find((entry) => entry.id === "asus-vg252q");
 
-  assert.ok(msi.observedAlongside.includes("asus-vg252q"));
+  assert.ok(msi.observedAlongside.includes(asus.id));
   assert.ok(asus.observedAlongside.includes(msi.id));
-  assert.ok(asus.observedAlongside.includes("msi-mpg274u-uhd"), "an earlier scan's observation is kept");
   assert.equal(settleLocally(msi, asus)?.outcome, "different");
+  assert.deepEqual(macOsAsus.observedAlongside, ["msi-mpg274u-uhd"], "an earlier scan is left alone");
 });
 
 test("re-importing the same scan changes nothing", () => {
-  const once = importScan(corpus, windowsScan, "note");
+  const once = importScan(seedCorpus, windowsScan, "note");
   const twice = importScan(once.corpus, windowsScan, "note");
 
   assert.equal(twice.added, 0);
@@ -187,13 +253,13 @@ test("re-importing the same scan changes nothing", () => {
 });
 
 test("an import without provenance is refused", () => {
-  assert.throws(() => importScan(corpus, windowsScan, undefined), /--note/);
-  assert.throws(() => importScan(corpus, { not: "an array" }, "note"), /muxsu-cli list --json/);
+  assert.throws(() => importScan(seedCorpus, windowsScan, undefined), /--note/);
+  assert.throws(() => importScan(seedCorpus, { not: "an array" }, "note"), /muxsu-cli list --json/);
 });
 
-test("the two product codes carrying one serial reach the model with that evidence", () => {
-  const imported = importScan(corpus, windowsScan, "note");
-  // What a second scan of the same panel in 4K mode would add.
+test("two product codes carrying one serial reach the model with that evidence", () => {
+  const imported = importScan(seedCorpus, windowsScan, "note");
+  // A second scan of the same panel, this time in 4K mode.
   const uhdOnWindows = {
     id: "windows:\\\\?\\DISPLAY#MSI3CF0#5&1234#0",
     name: "MPG 274U E16M",
@@ -205,12 +271,13 @@ test("the two product codes carrying one serial reach the model with that eviden
   const find = (code) =>
     both.corpus.identities.find((entry) => entry.productCode === code && entry.serialNumber === "CF0H246200009");
 
-  // Equal serials are not a reason for code to declare a merge — only the user
-  // may — so the pair still reaches the model, now carrying the serial.
+  // An identical serial is not a reason for code to declare a merge — only the
+  // user may — so the pair still reaches the model, now carrying the evidence.
   assert.equal(settleLocally(find("3CF0"), find("7CF0")), null);
   const state = stateFor(find("3CF0"), find("7CF0"));
   assert.equal(state.displayA.serialNumberRead, "CF0H246200009");
   assert.equal(state.displayB.serialNumberRead, "CF0H246200009");
+  assert.match(state.howTheseWereRead, /same EDID field/);
 });
 
 /** `cargo run -p muxsu-cli -- list --json > scan.json` in Windows PowerShell

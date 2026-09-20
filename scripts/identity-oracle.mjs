@@ -95,6 +95,31 @@ export function sameIdentity(left, right) {
   return a == null || b == null || a === b;
 }
 
+/** How a host read the serial it reports. An EDID carries two unrelated ones —
+ *  a 32-bit number and an optional text descriptor — and which a host reads is a
+ *  property of the host, not of the display. */
+export const SERIAL_FIELDS = {
+  edidSerialText: "the EDID serial-text descriptor, which is what Windows reports as WMI SerialNumberID",
+  edidNumericSerial: "the EDID 32-bit numeric serial, which is what macOS reads",
+};
+
+/**
+ * Whether two serial numbers mean anything when set side by side.
+ *
+ * Only when both were read from the same EDID field. One ASUS VG252Q shared
+ * between this pair of computers reads as `TH6TT0028525` on Windows and
+ * `576726074` on macOS — one display, two values, because the two hosts read
+ * two different fields. Comparing those concluded the panel was two panels.
+ */
+export function comparableSerials(left, right) {
+  return (
+    left.serialNumber != null &&
+    right.serialNumber != null &&
+    left.serialField != null &&
+    left.serialField === right.serialField
+  );
+}
+
 /** Whether the corpus records these two identities turning up in one scan. One
  *  panel is enumerated once, whichever mode it is in, so a scan that lists both
  *  is looking at two panels. */
@@ -115,8 +140,8 @@ export function settleLocally(left, right) {
   if (sameIdentity(left, right)) {
     return { outcome: "same", reason: "Already one identity under the app's own matching rule; there is nothing to merge." };
   }
-  if (left.serialNumber != null && right.serialNumber != null && left.serialNumber !== right.serialNumber) {
-    return { outcome: "different", reason: "Both identities carry a serial number and the two differ, so they are separate units." };
+  if (comparableSerials(left, right) && left.serialNumber !== right.serialNumber) {
+    return { outcome: "different", reason: "Both identities carry a serial number read from the same EDID field and the two differ, so they are separate units." };
   }
   if (seenTogether(left, right)) {
     return { outcome: "different", reason: "Both identities were enumerated in one scan, so they are two panels rather than two modes of one." };
@@ -151,6 +176,8 @@ function describe(identity) {
     edidProductCode: identity.productCode,
     edidProductName: identity.productName ?? null,
     serialNumberRead: identity.serialNumber ?? "none read from this display",
+    whichSerialFieldThatCameFrom:
+      identity.serialNumber == null ? null : SERIAL_FIELDS[identity.serialField] ?? "an unrecorded field",
     resolutionWhenObserved: identity.observedResolution ?? null,
     operatingSystemThatRead: identity.observedOn ?? null,
   };
@@ -172,6 +199,19 @@ function simultaneityFor(left, right) {
     : "There is no record either way of whether these two identities have ever been enumerated at the same time.";
 }
 
+/** Said only when it applies, because two serials from two different EDID
+ *  fields look like a contradiction and are not one. */
+function serialComparabilityFor(left, right) {
+  if (left.serialNumber == null || right.serialNumber == null) return "";
+  if (comparableSerials(left, right)) {
+    return " Both serial numbers were read from the same EDID field, so they can be compared directly.";
+  }
+  return (
+    " The two serial numbers were read from different EDID fields, which hold unrelated values, so the fact that they " +
+    "differ says nothing about whether these are one display or two."
+  );
+}
+
 export function stateFor(left, right) {
   return {
     displayA: describe(left),
@@ -179,7 +219,8 @@ export function stateFor(left, right) {
     howTheseWereRead:
       "Each identity was read from the EDID of a display attached to the same computer. A display that is asleep or " +
       "showing another computer cannot be read at all, so a scan does not necessarily list every display. " +
-      simultaneityFor(left, right),
+      simultaneityFor(left, right) +
+      serialComparabilityFor(left, right),
   };
 }
 
@@ -271,11 +312,20 @@ function platformOf(monitors) {
   return null;
 }
 
+/** Which EDID field this host's serial came from. Unknown for a host whose
+ *  platform the scan does not identify, and recorded as such rather than
+ *  guessed: a wrong field makes two serials look comparable when they are not. */
+function serialFieldFor(serial, platform) {
+  if (serial == null) return null;
+  if (platform === "Windows") return "edidSerialText";
+  if (platform === "macOS") return "edidNumericSerial";
+  return null;
+}
+
 function serialSourceFor(serial, platform) {
+  const field = serialFieldFor(serial, platform);
   if (serial == null) return "no serial read on this host";
-  if (platform === "Windows") return "EDID serial text, as Windows WMI SerialNumberID reads it";
-  if (platform === "macOS") return "EDID 32-bit numeric serial, as macOS reads it";
-  return "serial as this host read it";
+  return field ? SERIAL_FIELDS[field] : "serial as this host read it; which EDID field is not recorded";
 }
 
 /**
@@ -312,6 +362,7 @@ export function importScan(corpus, monitors, note) {
       productCode: fingerprint.product_code,
       productName: monitor.name ?? null,
       serialNumber: fingerprint.serial_number ?? null,
+      serialField: serialFieldFor(fingerprint.serial_number ?? null, platform),
       serialSource: serialSourceFor(fingerprint.serial_number ?? null, platform),
       observedResolution: monitor.maxResolution
         ? `${monitor.maxResolution.width}x${monitor.maxResolution.height}`
