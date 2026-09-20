@@ -6,6 +6,7 @@ import test from "node:test";
 
 import {
   candidatePairs,
+  decodeText,
   DEFAULT_MIN_CONFIDENCE,
   importScan,
   promote,
@@ -210,6 +211,35 @@ test("the two product codes carrying one serial reach the model with that eviden
   const state = stateFor(find("3CF0"), find("7CF0"));
   assert.equal(state.displayA.serialNumberRead, "CF0H246200009");
   assert.equal(state.displayB.serialNumberRead, "CF0H246200009");
+});
+
+/** `cargo run -p muxsu-cli -- list --json > scan.json` in Windows PowerShell
+ *  5.1 writes UTF-16LE with a byte-order mark, which read as UTF-8 fails on the
+ *  very first character. Notepad's UTF-8 mark does the same to a proposals file
+ *  edited by hand. */
+test("a scan is read whatever encoded it", () => {
+  const json = JSON.stringify(windowsScan);
+  const utf16le = Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(json, "utf16le")]);
+  const utf16be = Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from(json, "utf16le").swap16()]);
+  const utf8Bom = Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(json, "utf8")]);
+
+  for (const [label, bytes] of [["UTF-16LE", utf16le], ["UTF-16BE", utf16be], ["UTF-8 with a mark", utf8Bom], ["plain UTF-8", Buffer.from(json, "utf8")]]) {
+    assert.deepEqual(JSON.parse(decodeText(bytes)), windowsScan, `${label} must decode`);
+  }
+});
+
+test("non-ASCII survives every encoding a person might hand us", () => {
+  const value = { note: "MSI 螢幕 3840×2160", em: "—" };
+  const json = JSON.stringify(value);
+
+  assert.deepEqual(
+    JSON.parse(decodeText(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(json, "utf16le")]))),
+    value,
+  );
+  assert.deepEqual(
+    JSON.parse(decodeText(Buffer.concat([Buffer.from([0xef, 0xbb, 0xbf]), Buffer.from(json, "utf8")]))),
+    value,
+  );
 });
 
 test("only a human-approved proposal is promoted", () => {

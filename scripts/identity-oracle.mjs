@@ -392,8 +392,34 @@ const entryFor = (identity) => ({
 
 // `resolve` rather than `join`, so a path outside the repo — the scan file a
 // person just captured, say — is taken as given instead of appended to the root.
-const readJson = (path) => JSON.parse(readFileSync(resolve(root, path), "utf8"));
-const writeJson = (path, value) => writeFileSync(resolve(root, path), `${JSON.stringify(value, null, 2)}\n`);
+/**
+ * Text from a file whatever encoded it, by the byte-order mark it left.
+ *
+ * Every file this tool reads is one a person produced a moment earlier, and on
+ * Windows that means an encoding nobody chose: `>` in Windows PowerShell 5.1
+ * redirects to UTF-16LE, and Notepad writes UTF-8 with a mark on the front.
+ * Reading those as plain UTF-8 fails on the first character, which says nothing
+ * about what went wrong. Decode by the mark instead and the scan a person just
+ * captured simply works.
+ */
+export function decodeText(bytes) {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
+    return bytes.subarray(2).toString("utf16le");
+  }
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
+    // Node decodes UTF-16 little-endian only, so swap the pairs first.
+    return Buffer.from(bytes.subarray(2)).swap16().toString("utf16le");
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return bytes.subarray(3).toString("utf8");
+  }
+  return bytes.toString("utf8");
+}
+
+const readJson = (path) => JSON.parse(decodeText(readFileSync(resolve(root, path))));
+// Written as UTF-8 without a mark, so the corpus stays diffable wherever it is
+// regenerated.
+const writeJson = (path, value) => writeFileSync(resolve(root, path), `${JSON.stringify(value, null, 2)}\n`, "utf8");
 
 function argument(name, fallback) {
   const index = process.argv.indexOf(name);
@@ -455,7 +481,7 @@ async function propose() {
 function importCommand() {
   const corpusPath = argument("--corpus", DEFAULT_CORPUS);
   const scanPath = argument("--scan", null);
-  const scan = scanPath ? readJson(scanPath) : JSON.parse(readFileSync(0, "utf8"));
+  const scan = scanPath ? readJson(scanPath) : JSON.parse(decodeText(readFileSync(0)));
   const result = importScan(readJson(corpusPath), scan, argument("--note", null));
   writeJson(corpusPath, result.corpus);
   console.log(
