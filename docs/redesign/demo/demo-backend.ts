@@ -109,6 +109,13 @@ function dashboardState() {
     monitorIdentityClaims: scenario === "merge"
       ? [{ aliasKey: "DMO/3411/", aliasLabel: "DEMO Ultrawide 34 (DMO/3411)", primaryKey: "demo-uw34", primaryLabel: "DEMO Ultrawide 34" }]
       : [],
+    // What the backend's curated table of multi-identity models says about the
+    // display that just turned up: this Studio 27 at 1080p is the shared one at
+    // 4K. The real table carries only hardware someone has confirmed, so the
+    // demo's fictional model is named here rather than shipped in it.
+    mergeSuggestions: scenario === "merge"
+      ? [{ monitorId: studioAtLowRes.key, primaryKey: displays[1].key, primaryLabel: "DMO / 2720" }]
+      : [],
     resolvedMonitorIdentities: { ...identities(), [JSON.stringify(studioAtLowRes.fp)]: studioAtLowRes.key },
     localHostName: "DESKTOP-DEMO",
   };
