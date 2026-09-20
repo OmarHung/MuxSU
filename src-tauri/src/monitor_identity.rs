@@ -47,6 +47,17 @@ const MAX_CHAIN_DEPTH: usize = 8;
 /// as unknown rather than as a difference, and a host that cannot read a
 /// serial cannot tell two of a model apart on any other basis either.
 ///
+/// That rule is stricter than the hardware warrants, and deliberately so. An
+/// EDID holds two unrelated serials — a 32-bit number and a text descriptor —
+/// and each host reads only one of them, so one display shared between two
+/// computers can report two entirely different serials: this pair of machines
+/// reads an Acer VG252Q as `TH6TT0028525` on Windows and `576726074` on macOS.
+/// This function has no way to tell that apart from two units of the model, so
+/// it calls them two displays. What keeps that from costing a switch is
+/// `shared_monitor_index_for_peer`, which falls back to the model alone when no
+/// identity matches, and refuses as soon as more than one display could be
+/// meant. Nothing here should be loosened to cover the case instead.
+///
 /// Switching is untouched by this: a write still demands an exact match
 /// against a display present right now, and refuses outright when more than
 /// one display matches.

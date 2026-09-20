@@ -107,7 +107,10 @@ pub fn same_panel(left: &MonitorFingerprint, right: &MonitorFingerprint) -> bool
 /// Refusing an ambiguous match is the same discipline switching uses: with two
 /// candidates the table cannot say which the user means, and preselecting either
 /// would be a guess dressed up as an answer.
-pub fn suggested_primary(alias: &MonitorFingerprint, candidates: &[MonitorFingerprint]) -> Option<usize> {
+pub fn suggested_primary(
+    alias: &MonitorFingerprint,
+    candidates: &[MonitorFingerprint],
+) -> Option<usize> {
     let mut matched = candidates
         .iter()
         .enumerate()
@@ -150,8 +153,7 @@ mod tests {
 
     #[test]
     fn a_serial_number_does_not_change_whether_two_models_are_one_panel() {
-        let with_serial =
-            MonitorFingerprint::new("MSI", "3CF0", Some("PC-SERIAL".to_owned()));
+        let with_serial = MonitorFingerprint::new("MSI", "3CF0", Some("PC-SERIAL".to_owned()));
 
         assert!(same_panel(&with_serial, &fingerprint("MSI", "7CF0")));
     }
@@ -190,7 +192,10 @@ mod tests {
     #[test]
     fn nothing_is_suggested_when_no_candidate_or_more_than_one_is_grouped() {
         let unrelated = [fingerprint("ACR", "0725"), fingerprint("AOC", "2402")];
-        assert_eq!(suggested_primary(&fingerprint("MSI", "3CF0"), &unrelated), None);
+        assert_eq!(
+            suggested_primary(&fingerprint("MSI", "3CF0"), &unrelated),
+            None
+        );
         assert_eq!(suggested_primary(&fingerprint("MSI", "3CF0"), &[]), None);
 
         // Two units of the display's other mode: the table cannot say which one.
@@ -198,6 +203,9 @@ mod tests {
             MonitorFingerprint::new("MSI", "7CF0", Some("FIRST".to_owned())),
             MonitorFingerprint::new("MSI", "7CF0", Some("SECOND".to_owned())),
         ];
-        assert_eq!(suggested_primary(&fingerprint("MSI", "3CF0"), &ambiguous), None);
+        assert_eq!(
+            suggested_primary(&fingerprint("MSI", "3CF0"), &ambiguous),
+            None
+        );
     }
 }

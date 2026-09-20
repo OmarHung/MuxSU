@@ -1571,12 +1571,8 @@ async fn get_dashboard_state(app: AppHandle) -> Result<DashboardState, String> {
 
 fn build_dashboard_state(state: &AppRuntime, app: &AppHandle) -> Result<DashboardState, String> {
     let mut settings = read_settings(state)?;
-    let (monitors, uncontrollable_monitors, shared, selection_notices): (
-        Vec<MonitorDescriptor>,
-        Vec<MonitorDescriptor>,
-        Vec<SharedMonitorStatus>,
-        Vec<String>,
-    ) = match enumerate_monitor_inventory() {
+    let (monitors, uncontrollable_monitors, shared, selection_notices) =
+        match enumerate_monitor_inventory() {
             Ok(inventory) => {
                 diagnostics::remember_inventory(&inventory.detected, &inventory.current_inputs);
                 let changes = reconcile_monitor_selection(&mut settings, &inventory.controllable);
@@ -1633,7 +1629,7 @@ fn build_dashboard_state(state: &AppRuntime, app: &AppHandle) -> Result<Dashboar
                     .into_iter()
                     .filter_map(selection_notice_text)
                     .collect();
-                let shared = settings
+                let shared: Vec<SharedMonitorStatus> = settings
                     .shared_monitors
                     .iter()
                     .map(|selected| {
@@ -1709,7 +1705,6 @@ fn build_dashboard_state(state: &AppRuntime, app: &AppHandle) -> Result<Dashboar
         .chain(uncontrollable_monitors.iter())
         .collect::<Vec<_>>();
     let merge_suggestions = merge_suggestions(&settings, &present, &shared);
-    drop(present);
     Ok(DashboardState {
         platform: std::env::consts::OS,
         local_host: settings.local_host,
@@ -2702,6 +2697,14 @@ fn shared_monitor_index_for_peer(
     // An identity the user merged into a shared display names that display, so
     // a paired host reading the same panel in another display mode still lands
     // on it rather than looking like a display we do not share.
+    //
+    // The fall back to the model alone below is not laziness. Two hosts read
+    // two different EDID serial fields, so one shared display can reach us
+    // under a serial we will never read from it — an Acer VG252Q is
+    // `TH6TT0028525` here and `576726074` on the Mac — and `same_identity`
+    // reads that as two displays. Matching on the model recovers it without
+    // ever guessing: with a second display of that model shared, this returns
+    // `None` and the switch is refused rather than written to the wrong panel.
     if let Some(exact) = monitors.iter().position(|selected| {
         monitor_identity::is_same_display(links, &selected.fingerprint, remote)
     }) {
@@ -8838,6 +8841,43 @@ mod tests {
                 &links,
                 &MonitorFingerprint::new("ACR", "0725", Some("576726074".to_owned()))
             ),
+            None
+        );
+    }
+
+    /// Windows reads the EDID's serial-text descriptor and macOS its 32-bit
+    /// number, so one Acer VG252Q shared between these computers arrives from
+    /// the Mac under a serial this host will never read from it. Matching on
+    /// the model alone is what gets the switch onto the right panel.
+    fn acer(serial: &str) -> MonitorFingerprint {
+        MonitorFingerprint::new("ACR", "0725", Some(serial.to_owned()))
+    }
+
+    #[test]
+    fn one_display_two_hosts_read_different_serials_from_still_resolves() {
+        let mut selected = SelectedMonitor::from(&monitor("shared"));
+        selected.fingerprint = acer("TH6TT0028525");
+        let monitors = [selected];
+
+        assert!(!monitor_identity::same_identity(
+            &monitors[0].fingerprint,
+            &acer("576726074")
+        ));
+        assert_eq!(
+            shared_monitor_index_for_peer(&monitors, &[], &acer("576726074")),
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn two_of_one_model_shared_refuse_a_peer_rather_than_guess() {
+        let mut first = SelectedMonitor::from(&monitor("shared"));
+        first.fingerprint = acer("TH6TT0028525");
+        let mut second = SelectedMonitor::from(&monitor("other"));
+        second.fingerprint = acer("SECOND-UNIT");
+
+        assert_eq!(
+            shared_monitor_index_for_peer(&[first, second], &[], &acer("576726074")),
             None
         );
     }
