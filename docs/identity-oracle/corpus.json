@@ -13,7 +13,7 @@
       "observedOn": "macOS",
       "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
       "observedAlongside": [
-        "asus-vg252q"
+        "acer-vg252q"
       ]
     },
     {
@@ -29,7 +29,7 @@
       "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
     },
     {
-      "id": "asus-vg252q",
+      "id": "acer-vg252q",
       "manufacturerId": "ACR",
       "productCode": "0725",
       "productName": "VG252Q",

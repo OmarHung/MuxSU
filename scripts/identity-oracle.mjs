@@ -39,21 +39,22 @@
  * single scan listed as having been seen together, which is how it knows those
  * are separate panels.
  *
- * What the first live run against `jev-1.13.0` showed, on 2026-09-20, over the
- * five identities in the corpus — read this before expecting more of the tool:
+ * What live runs against `jev-1.13.0` showed on 2026-09-20, over the eight
+ * identities in the corpus — read this before expecting more of the tool:
  *
- * - Every pair that is two different displays came back as one, at confidence
- *   0.91 to 0.97. That is what the tool is good for: clearing the obvious so a
- *   person only reads the pairs that are genuinely open.
- * - The one pair that really is two modes of one panel (the MSI MPG 274U's
- *   `3CF0` and `7CF0`) came back in the middle level, "ask the person who owns
- *   them", at score 1.21. It is not wrong to. Neither identity carries a serial
- *   number, so the evidence cannot separate one panel in two modes from two
- *   units of that model left in different modes — which is exactly why
- *   `product-facts.md` says only the user may declare it.
- * - So the model has never proposed "same" here, and the confidence gate below
- *   has never fired. Expect this tool to shrink the review pile, not to grow the
- *   shipped table on its own. Entries still arrive by a person's judgment.
+ * - A serial number decides how far the model will go. The MSI MPG 274U's two
+ *   product codes scored 1.19 as macOS reads them, with no serial on either
+ *   side, and 1.51 once Windows had read one identical serial for both. That is
+ *   the difference between "cannot tell" and the top level.
+ * - Even so, nothing has been proposed as one display yet. That 1.51 came with
+ *   confidence 0.26, so the gate below turned it back into a question for the
+ *   curator, which is what a spread that wide should do to a merge that cannot
+ *   be undone by looking at a screen.
+ * - Pairs the model is sure about are the ones that are plainly different
+ *   displays: those land at 0.02 to 0.06 with confidence up to 0.97.
+ *
+ * So expect this to shrink the review pile rather than grow the shipped table.
+ * Entries still arrive by a person's judgment.
  */
 
 import { createHash } from "node:crypto";
@@ -106,7 +107,7 @@ export const SERIAL_FIELDS = {
 /**
  * Whether two serial numbers mean anything when set side by side.
  *
- * Only when both were read from the same EDID field. One ASUS VG252Q shared
+ * Only when both were read from the same EDID field. One Acer VG252Q shared
  * between this pair of computers reads as `TH6TT0028525` on Windows and
  * `576726074` on macOS — one display, two values, because the two hosts read
  * two different fields. Comparing those concluded the panel was two panels.
@@ -132,9 +133,9 @@ export function seenTogether(left, right) {
 /**
  * Whether ordinary code already knows how this pair relates, so it never
  * reaches the model. Both rules are deductions from what was observed, not
- * judgment calls: two serials that both exist and differ are two units — that
- * is MuxSU's own documented rule — and two identities enumerated in one scan
- * are two panels.
+ * judgment calls: two serials read from the same EDID field that differ are two
+ * units — that is MuxSU's own documented rule — and two identities enumerated in
+ * one scan are two panels.
  */
 export function settleLocally(left, right) {
   if (sameIdentity(left, right)) {

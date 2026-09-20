@@ -52,12 +52,12 @@ test("two serials from the same EDID field that differ are settled in code, not 
   assert.match(settled.reason, /same EDID field/);
 });
 
-/** One ASUS VG252Q shared between these two computers reads as `TH6TT0028525`
+/** One Acer VG252Q shared between these two computers reads as `TH6TT0028525`
  *  on Windows and `576726074` on macOS, because Windows reports the EDID's
  *  serial-text descriptor and macOS its 32-bit numeric serial. Comparing those
  *  concluded one display was two. */
 test("serials from different EDID fields are not compared at all", () => {
-  const macOs = identity("asus-vg252q");
+  const macOs = identity("acer-vg252q");
   const windows = identity("acr-0725-th6tt0028525");
 
   assert.notEqual(macOs.serialNumber, windows.serialNumber);
@@ -85,14 +85,14 @@ test("an identity with no serial says nothing about serial fields", () => {
 });
 
 test("two identities one scan listed together are settled in code as two panels", () => {
-  const settled = settleLocally(identity("msi-mpg274u-uhd"), identity("asus-vg252q"));
+  const settled = settleLocally(identity("msi-mpg274u-uhd"), identity("acer-vg252q"));
 
   assert.equal(settled?.outcome, "different");
   assert.match(settled.reason, /one scan/);
 });
 
 test("state says what is on record about simultaneity and never asserts more", () => {
-  const liveScanPair = stateFor(identity("msi-mpg274u-uhd"), identity("asus-vg252q"));
+  const liveScanPair = stateFor(identity("msi-mpg274u-uhd"), identity("acer-vg252q"));
   const fixturePair = stateFor(identity("aoc-24b2hm2"), identity("aoc-24b2w1"));
 
   assert.match(liveScanPair.howTheseWereRead, /no scan has ever listed the two of them together/);
@@ -156,10 +156,10 @@ const seedCorpus = {
       serialField: null,
       observedResolution: "3840x2160",
       observedOn: "macOS",
-      observedAlongside: ["asus-vg252q"],
+      observedAlongside: ["acer-vg252q"],
     },
     {
-      id: "asus-vg252q",
+      id: "acer-vg252q",
       manufacturerId: "ACR",
       productCode: "0725",
       productName: "VG252Q",
@@ -222,26 +222,26 @@ test("a scan adds what a host read and skips its built-in panel", () => {
  *  compared at all. */
 test("a host reading a different serial field gets its own entry", () => {
   const imported = importScan(seedCorpus, windowsScan, "note");
-  const asus = imported.corpus.identities.filter((entry) => entry.manufacturerId === "ACR");
+  const acer = imported.corpus.identities.filter((entry) => entry.manufacturerId === "ACR");
 
   assert.equal(imported.added, 2, "both of the Windows readings are new");
   assert.deepEqual(
-    asus.map((entry) => `${entry.serialNumber}/${entry.serialField}`),
+    acer.map((entry) => `${entry.serialNumber}/${entry.serialField}`),
     ["576726074/edidNumericSerial", "TH6TT0028525/edidSerialText"],
   );
-  assert.equal(settleLocally(asus[0], asus[1]), null, "one panel must not be settled as two");
+  assert.equal(settleLocally(acer[0], acer[1]), null, "one panel must not be settled as two");
 });
 
 test("everything one scan listed is recorded as seen together", () => {
   const imported = importScan(seedCorpus, windowsScan, "note");
   const msi = imported.corpus.identities.find((entry) => entry.serialNumber === "CF0H246200009");
-  const asus = imported.corpus.identities.find((entry) => entry.serialNumber === "TH6TT0028525");
-  const macOsAsus = imported.corpus.identities.find((entry) => entry.id === "asus-vg252q");
+  const acer = imported.corpus.identities.find((entry) => entry.serialNumber === "TH6TT0028525");
+  const macOsAcer = imported.corpus.identities.find((entry) => entry.id === "acer-vg252q");
 
-  assert.ok(msi.observedAlongside.includes(asus.id));
-  assert.ok(asus.observedAlongside.includes(msi.id));
-  assert.equal(settleLocally(msi, asus)?.outcome, "different");
-  assert.deepEqual(macOsAsus.observedAlongside, ["msi-mpg274u-uhd"], "an earlier scan is left alone");
+  assert.ok(msi.observedAlongside.includes(acer.id));
+  assert.ok(acer.observedAlongside.includes(msi.id));
+  assert.equal(settleLocally(msi, acer)?.outcome, "different");
+  assert.deepEqual(macOsAcer.observedAlongside, ["msi-mpg274u-uhd"], "an earlier scan is left alone");
 });
 
 test("re-importing the same scan changes nothing", () => {

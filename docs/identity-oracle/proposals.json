@@ -2,7 +2,7 @@
   "note": "Written by scripts/identity-oracle.mjs. Review each proposal and set \"approved\": true on the ones you accept, then run: node scripts/identity-oracle.mjs promote",
   "model": "jev-1.13.0",
   "minConfidence": 0.6,
-  "generatedAt": "2026-09-20T07:14:26.382Z",
+  "generatedAt": "2026-09-20T07:18:21.343Z",
   "settledInCode": [
     {
       "left": {
@@ -17,11 +17,11 @@
         "observedOn": "macOS",
         "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
         "observedAlongside": [
-          "asus-vg252q"
+          "acer-vg252q"
         ]
       },
       "right": {
-        "id": "asus-vg252q",
+        "id": "acer-vg252q",
         "manufacturerId": "ACR",
         "productCode": "0725",
         "productName": "VG252Q",
@@ -52,7 +52,7 @@
         "observedOn": "macOS",
         "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
         "observedAlongside": [
-          "asus-vg252q"
+          "acer-vg252q"
         ]
       },
       "right": {
@@ -108,7 +108,7 @@
     },
     {
       "left": {
-        "id": "asus-vg252q",
+        "id": "acer-vg252q",
         "manufacturerId": "ACR",
         "productCode": "0725",
         "productName": "VG252Q",
@@ -322,7 +322,7 @@
         "observedOn": "macOS",
         "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
         "observedAlongside": [
-          "asus-vg252q"
+          "acer-vg252q"
         ]
       },
       "right": {
@@ -362,7 +362,7 @@
         "observedOn": "macOS",
         "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
         "observedAlongside": [
-          "asus-vg252q"
+          "acer-vg252q"
         ]
       },
       "right": {
@@ -402,7 +402,7 @@
         "observedOn": "macOS",
         "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
         "observedAlongside": [
-          "asus-vg252q"
+          "acer-vg252q"
         ]
       },
       "right": {
@@ -442,7 +442,7 @@
         "observedOn": "macOS",
         "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
         "observedAlongside": [
-          "asus-vg252q"
+          "acer-vg252q"
         ]
       },
       "right": {
@@ -486,7 +486,7 @@
         "observedOn": "macOS",
         "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
         "observedAlongside": [
-          "asus-vg252q"
+          "acer-vg252q"
         ]
       },
       "right": {
@@ -530,7 +530,7 @@
         "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
       },
       "right": {
-        "id": "asus-vg252q",
+        "id": "acer-vg252q",
         "manufacturerId": "ACR",
         "productCode": "0725",
         "productName": "VG252Q",
@@ -713,7 +713,7 @@
     },
     {
       "left": {
-        "id": "asus-vg252q",
+        "id": "acer-vg252q",
         "manufacturerId": "ACR",
         "productCode": "0725",
         "productName": "VG252Q",
@@ -753,7 +753,7 @@
     },
     {
       "left": {
-        "id": "asus-vg252q",
+        "id": "acer-vg252q",
         "manufacturerId": "ACR",
         "productCode": "0725",
         "productName": "VG252Q",
@@ -797,7 +797,7 @@
     },
     {
       "left": {
-        "id": "asus-vg252q",
+        "id": "acer-vg252q",
         "manufacturerId": "ACR",
         "productCode": "0725",
         "productName": "VG252Q",
@@ -840,7 +840,7 @@
     },
     {
       "left": {
-        "id": "asus-vg252q",
+        "id": "acer-vg252q",
         "manufacturerId": "ACR",
         "productCode": "0725",
         "productName": "VG252Q",
