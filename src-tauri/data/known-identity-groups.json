@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "note": "Display models known to publish more than one EDID identity, one group per physical panel. The app uses this only to preselect the likely target when the user is offered a merge in settings; it never declares an equivalence on the user's behalf, and it never widens what may be switched. Curated by hand — see scripts/identity-oracle.mjs for how candidates are proposed.",
+  "groups": [
+    {
+      "panel": "MSI MPG 274U",
+      "identities": [
+        { "manufacturerId": "MSI", "productCode": "3CF0" },
+        { "manufacturerId": "MSI", "productCode": "7CF0" }
+      ],
+      "source": "product-facts",
+      "evidence": "product-facts.md: the same panel publishes MSI:3CF0 at 3840x2160 and MSI:7CF0 at 1920x1080. Confirmed on real hardware, and macOS's own display records report the same two values."
+    }
+  ]
+}

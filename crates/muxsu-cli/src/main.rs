@@ -17,7 +17,16 @@ fn run(mut args: impl Iterator<Item = String>) -> Result<()> {
     let command = args.next().unwrap_or_else(|| "help".to_owned());
 
     match command.as_str() {
-        "list" => list_monitors(),
+        "list" => match args.next().as_deref() {
+            None => list_monitors(),
+            // Machine-readable form of the same scan, for tools that would
+            // otherwise have to parse the human output. Everything one `list`
+            // reports was enumerated together, which is what lets
+            // `scripts/identity-oracle.mjs import` record that two identities
+            // are two panels rather than two modes of one.
+            Some("--json") => list_monitors_as_json(),
+            Some(other) => bail!("不支援的參數：{other}"),
+        },
         "switch" => {
             let manufacturer = args.next().context("缺少 manufacturer ID")?;
             let product = args.next().context("缺少 product code")?;
@@ -69,6 +78,20 @@ fn list_monitors() -> Result<()> {
 
 #[cfg(not(target_os = "windows"))]
 fn list_monitors() -> Result<()> {
+    bail!(muxsu_core::DisplayMuxError::UnsupportedPlatform)
+}
+
+#[cfg(target_os = "windows")]
+fn list_monitors_as_json() -> Result<()> {
+    let monitors = controller()?.enumerate()?;
+    let stdout = io::stdout();
+    let mut output = stdout.lock();
+    writeln!(output, "{}", serde_json::to_string_pretty(&monitors)?)?;
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn list_monitors_as_json() -> Result<()> {
     bail!(muxsu_core::DisplayMuxError::UnsupportedPlatform)
 }
 
@@ -138,7 +161,7 @@ fn print_help() -> Result<()> {
     let stdout = io::stdout();
     let mut output = stdout.lock();
     writeln!(output, "MuxSU CLI")?;
-    writeln!(output, "  muxsu-cli list")?;
+    writeln!(output, "  muxsu-cli list [--json]")?;
     writeln!(
         output,
         "  muxsu-cli switch <manufacturer> <product> <serial|-> <input> [--dry-run]"

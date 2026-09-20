@@ -2454,6 +2454,7 @@ version = "0.7.1"
 dependencies = [
  "anyhow",
  "muxsu-core",
+ "serde_json",
 ]
 
 [[package]]

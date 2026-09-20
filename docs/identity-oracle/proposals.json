@@ -1,0 +1,1086 @@
+{
+  "note": "Written by scripts/identity-oracle.mjs. Review each proposal and set \"approved\": true on the ones you accept, then run: node scripts/identity-oracle.mjs promote",
+  "model": "jev-1.13.0",
+  "minConfidence": 0.6,
+  "generatedAt": "2026-09-20T07:18:21.343Z",
+  "settledInCode": [
+    {
+      "left": {
+        "id": "msi-mpg274u-uhd",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display",
+        "observedResolution": "3840x2160",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
+        "observedAlongside": [
+          "acer-vg252q"
+        ]
+      },
+      "right": {
+        "id": "acer-vg252q",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "576726074",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial, as macOS reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20; its capabilities string calls itself model(VG251QX)",
+        "observedAlongside": [
+          "msi-mpg274u-uhd"
+        ]
+      },
+      "outcome": "different",
+      "reason": "Both identities were enumerated in one scan, so they are two panels rather than two modes of one.",
+      "decidedBy": "code"
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-uhd",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display",
+        "observedResolution": "3840x2160",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
+        "observedAlongside": [
+          "acer-vg252q"
+        ]
+      },
+      "right": {
+        "id": "msi-3cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "3840x2160",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "same",
+      "reason": "Already one identity under the app's own matching rule; there is nothing to merge.",
+      "decidedBy": "code"
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-fhd",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display in either mode",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
+      },
+      "right": {
+        "id": "msi-7cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 1920x1080",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "same",
+      "reason": "Already one identity under the app's own matching rule; there is nothing to merge.",
+      "decidedBy": "code"
+    },
+    {
+      "left": {
+        "id": "acer-vg252q",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "576726074",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial, as macOS reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20; its capabilities string calls itself model(VG251QX)",
+        "observedAlongside": [
+          "msi-mpg274u-uhd"
+        ]
+      },
+      "right": {
+        "id": "aoc-24b2w1",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2W1",
+        "serialNumber": "2885",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial; this EDID carries no serial-text descriptor",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2W1_HDMI"
+      },
+      "outcome": "different",
+      "reason": "Both identities carry a serial number read from the same EDID field and the two differ, so they are separate units.",
+      "decidedBy": "code"
+    },
+    {
+      "left": {
+        "id": "aoc-24b2hm2",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2HM2",
+        "serialNumber": "1GAQ1HA000232",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial-text descriptor, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2HM2_HDMI"
+      },
+      "right": {
+        "id": "acr-0725-th6tt0028525",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "TH6TT0028525",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "msi-3cf0-cf0h246200009",
+          "msi-7cf0-cf0h246200009"
+        ]
+      },
+      "outcome": "different",
+      "reason": "Both identities carry a serial number read from the same EDID field and the two differ, so they are separate units.",
+      "decidedBy": "code"
+    },
+    {
+      "left": {
+        "id": "aoc-24b2hm2",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2HM2",
+        "serialNumber": "1GAQ1HA000232",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial-text descriptor, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2HM2_HDMI"
+      },
+      "right": {
+        "id": "msi-3cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "3840x2160",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "different",
+      "reason": "Both identities carry a serial number read from the same EDID field and the two differ, so they are separate units.",
+      "decidedBy": "code"
+    },
+    {
+      "left": {
+        "id": "aoc-24b2hm2",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2HM2",
+        "serialNumber": "1GAQ1HA000232",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial-text descriptor, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2HM2_HDMI"
+      },
+      "right": {
+        "id": "msi-7cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 1920x1080",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "different",
+      "reason": "Both identities carry a serial number read from the same EDID field and the two differ, so they are separate units.",
+      "decidedBy": "code"
+    },
+    {
+      "left": {
+        "id": "acr-0725-th6tt0028525",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "TH6TT0028525",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "msi-3cf0-cf0h246200009",
+          "msi-7cf0-cf0h246200009"
+        ]
+      },
+      "right": {
+        "id": "msi-3cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "3840x2160",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "different",
+      "reason": "Both identities carry a serial number read from the same EDID field and the two differ, so they are separate units.",
+      "decidedBy": "code"
+    },
+    {
+      "left": {
+        "id": "acr-0725-th6tt0028525",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "TH6TT0028525",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "msi-3cf0-cf0h246200009",
+          "msi-7cf0-cf0h246200009"
+        ]
+      },
+      "right": {
+        "id": "msi-7cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 1920x1080",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "different",
+      "reason": "Both identities carry a serial number read from the same EDID field and the two differ, so they are separate units.",
+      "decidedBy": "code"
+    }
+  ],
+  "proposals": [
+    {
+      "left": {
+        "id": "msi-mpg274u-uhd",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display",
+        "observedResolution": "3840x2160",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
+        "observedAlongside": [
+          "acer-vg252q"
+        ]
+      },
+      "right": {
+        "id": "msi-mpg274u-fhd",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display in either mode",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
+      },
+      "outcome": "ask",
+      "level": 1,
+      "score": 1.19,
+      "confidence": 0.59,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.9,
+        "modeChangeExplainsDifference": 0.26,
+        "differentPanelSize": 0.07
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-uhd",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display",
+        "observedResolution": "3840x2160",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
+        "observedAlongside": [
+          "acer-vg252q"
+        ]
+      },
+      "right": {
+        "id": "aoc-24b2hm2",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2HM2",
+        "serialNumber": "1GAQ1HA000232",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial-text descriptor, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2HM2_HDMI"
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.01,
+      "confidence": 0.98,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.02,
+        "modeChangeExplainsDifference": 0.02,
+        "differentPanelSize": 0.76
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-uhd",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display",
+        "observedResolution": "3840x2160",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
+        "observedAlongside": [
+          "acer-vg252q"
+        ]
+      },
+      "right": {
+        "id": "aoc-24b2w1",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2W1",
+        "serialNumber": "2885",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial; this EDID carries no serial-text descriptor",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2W1_HDMI"
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.02,
+      "confidence": 0.97,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.02,
+        "modeChangeExplainsDifference": 0.03,
+        "differentPanelSize": 0.75
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-uhd",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display",
+        "observedResolution": "3840x2160",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
+        "observedAlongside": [
+          "acer-vg252q"
+        ]
+      },
+      "right": {
+        "id": "acr-0725-th6tt0028525",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "TH6TT0028525",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "msi-3cf0-cf0h246200009",
+          "msi-7cf0-cf0h246200009"
+        ]
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.11,
+      "confidence": 0.84,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.03,
+        "modeChangeExplainsDifference": 0.03,
+        "differentPanelSize": 0.74
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-uhd",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display",
+        "observedResolution": "3840x2160",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
+        "observedAlongside": [
+          "acer-vg252q"
+        ]
+      },
+      "right": {
+        "id": "msi-7cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 1920x1080",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "ask",
+      "level": 1,
+      "score": 1.08,
+      "confidence": 0.42,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.91,
+        "modeChangeExplainsDifference": 0.17,
+        "differentPanelSize": 0.07
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-fhd",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display in either mode",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
+      },
+      "right": {
+        "id": "acer-vg252q",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "576726074",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial, as macOS reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20; its capabilities string calls itself model(VG251QX)",
+        "observedAlongside": [
+          "msi-mpg274u-uhd"
+        ]
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.09,
+      "confidence": 0.86,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.04,
+        "modeChangeExplainsDifference": 0.03,
+        "differentPanelSize": 0.51
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-fhd",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display in either mode",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
+      },
+      "right": {
+        "id": "aoc-24b2hm2",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2HM2",
+        "serialNumber": "1GAQ1HA000232",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial-text descriptor, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2HM2_HDMI"
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.03,
+      "confidence": 0.95,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.02,
+        "modeChangeExplainsDifference": 0.03,
+        "differentPanelSize": 0.75
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-fhd",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display in either mode",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
+      },
+      "right": {
+        "id": "aoc-24b2w1",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2W1",
+        "serialNumber": "2885",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial; this EDID carries no serial-text descriptor",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2W1_HDMI"
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.04,
+      "confidence": 0.94,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.02,
+        "modeChangeExplainsDifference": 0.03,
+        "differentPanelSize": 0.62
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-fhd",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display in either mode",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
+      },
+      "right": {
+        "id": "acr-0725-th6tt0028525",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "TH6TT0028525",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "msi-3cf0-cf0h246200009",
+          "msi-7cf0-cf0h246200009"
+        ]
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.09,
+      "confidence": 0.86,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.03,
+        "modeChangeExplainsDifference": 0.03,
+        "differentPanelSize": 0.55
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-mpg274u-fhd",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": null,
+        "serialField": null,
+        "serialSource": "macOS reads no serial from this display in either mode",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
+      },
+      "right": {
+        "id": "msi-3cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "3840x2160",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "ask",
+      "level": 1,
+      "score": 1.1,
+      "confidence": 0.59,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.92,
+        "modeChangeExplainsDifference": 0.19,
+        "differentPanelSize": 0.06
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "acer-vg252q",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "576726074",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial, as macOS reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20; its capabilities string calls itself model(VG251QX)",
+        "observedAlongside": [
+          "msi-mpg274u-uhd"
+        ]
+      },
+      "right": {
+        "id": "aoc-24b2hm2",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2HM2",
+        "serialNumber": "1GAQ1HA000232",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial-text descriptor, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2HM2_HDMI"
+      },
+      "outcome": "ask",
+      "level": 1,
+      "score": 0.54,
+      "confidence": 0.31,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.07,
+        "modeChangeExplainsDifference": 0.04,
+        "differentPanelSize": 0.59
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "acer-vg252q",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "576726074",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial, as macOS reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20; its capabilities string calls itself model(VG251QX)",
+        "observedAlongside": [
+          "msi-mpg274u-uhd"
+        ]
+      },
+      "right": {
+        "id": "acr-0725-th6tt0028525",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "TH6TT0028525",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "msi-3cf0-cf0h246200009",
+          "msi-7cf0-cf0h246200009"
+        ]
+      },
+      "outcome": "ask",
+      "level": 1,
+      "score": 0.9,
+      "confidence": 0.83,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.97,
+        "modeChangeExplainsDifference": 0.21,
+        "differentPanelSize": 0.05
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "acer-vg252q",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "576726074",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial, as macOS reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20; its capabilities string calls itself model(VG251QX)",
+        "observedAlongside": [
+          "msi-mpg274u-uhd"
+        ]
+      },
+      "right": {
+        "id": "msi-3cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "3840x2160",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.46,
+      "confidence": 0.31,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.04,
+        "modeChangeExplainsDifference": 0.05,
+        "differentPanelSize": 0.23
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "acer-vg252q",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "576726074",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial, as macOS reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "macOS",
+        "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20; its capabilities string calls itself model(VG251QX)",
+        "observedAlongside": [
+          "msi-mpg274u-uhd"
+        ]
+      },
+      "right": {
+        "id": "msi-7cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 1920x1080",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "ask",
+      "level": 1,
+      "score": 0.54,
+      "confidence": 0.29,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.07,
+        "modeChangeExplainsDifference": 0.04,
+        "differentPanelSize": 0.2
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "aoc-24b2hm2",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2HM2",
+        "serialNumber": "1GAQ1HA000232",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial-text descriptor, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2HM2_HDMI"
+      },
+      "right": {
+        "id": "aoc-24b2w1",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2W1",
+        "serialNumber": "2885",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial; this EDID carries no serial-text descriptor",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2W1_HDMI"
+      },
+      "outcome": "ask",
+      "level": 1,
+      "score": 0.95,
+      "confidence": 0.84,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.31,
+        "modeChangeExplainsDifference": 0.07,
+        "differentPanelSize": 0.09
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "aoc-24b2w1",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2W1",
+        "serialNumber": "2885",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial; this EDID carries no serial-text descriptor",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2W1_HDMI"
+      },
+      "right": {
+        "id": "acr-0725-th6tt0028525",
+        "manufacturerId": "ACR",
+        "productCode": "0725",
+        "productName": "VG252Q",
+        "serialNumber": "TH6TT0028525",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "msi-3cf0-cf0h246200009",
+          "msi-7cf0-cf0h246200009"
+        ]
+      },
+      "outcome": "ask",
+      "level": 1,
+      "score": 0.68,
+      "confidence": 0.51,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.04,
+        "modeChangeExplainsDifference": 0.03,
+        "differentPanelSize": 0.43
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "aoc-24b2w1",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2W1",
+        "serialNumber": "2885",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial; this EDID carries no serial-text descriptor",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2W1_HDMI"
+      },
+      "right": {
+        "id": "msi-3cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "3840x2160",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.34,
+      "confidence": 0.49,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.02,
+        "modeChangeExplainsDifference": 0.03,
+        "differentPanelSize": 0.63
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "aoc-24b2w1",
+        "manufacturerId": "AOC",
+        "productCode": "2402",
+        "productName": "24B2W1",
+        "serialNumber": "2885",
+        "serialField": "edidNumericSerial",
+        "serialSource": "EDID 32-bit numeric serial; this EDID carries no serial-text descriptor",
+        "observedResolution": "1920x1080",
+        "observedOn": "captured EDID",
+        "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2W1_HDMI"
+      },
+      "right": {
+        "id": "msi-7cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 1920x1080",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "different",
+      "level": 0,
+      "score": 0.34,
+      "confidence": 0.48,
+      "downgradedByConfidence": false,
+      "reasons": {
+        "sameProductLine": 0.02,
+        "modeChangeExplainsDifference": 0.03,
+        "differentPanelSize": 0.72
+      },
+      "approved": null
+    },
+    {
+      "left": {
+        "id": "msi-3cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "3CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "3840x2160",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 3840x2160",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "right": {
+        "id": "msi-7cf0-cf0h246200009",
+        "manufacturerId": "MSI",
+        "productCode": "7CF0",
+        "productName": "MPG 274U E16M",
+        "serialNumber": "CF0H246200009",
+        "serialField": "edidSerialText",
+        "serialSource": "EDID serial text, as Windows WMI SerialNumberID reads it",
+        "observedResolution": "1920x1080",
+        "observedOn": "Windows",
+        "provenance": "Windows 11, MSI MPG 274U at 1920x1080",
+        "observedAlongside": [
+          "acr-0725-th6tt0028525"
+        ]
+      },
+      "outcome": "ask",
+      "level": 2,
+      "score": 1.51,
+      "confidence": 0.26,
+      "downgradedByConfidence": true,
+      "reasons": {
+        "sameProductLine": 0.93,
+        "modeChangeExplainsDifference": 0.22,
+        "differentPanelSize": 0.06
+      },
+      "approved": null
+    }
+  ]
+}

@@ -24,6 +24,9 @@ importers:
       '@tauri-apps/cli':
         specifier: ^2.8.4
         version: 2.11.4
+      '@typesafe-ai/sdk':
+        specifier: ^0.6.0
+        version: 0.6.0
       typescript:
         specifier: ^5.9.2
         version: 5.9.3
@@ -422,6 +425,10 @@ packages:
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
 
+  '@typesafe-ai/sdk@0.6.0':
+    resolution: {integrity: sha512-IddX+Q0XM+VagOUZFeP7wZjaO4SHMdvnh2zEBdrZZnXedWI3BNK1lKhMx3ayrkFWvVLbVcUHJy6AVZlY+e6Jaw==}
+    engines: {node: '>=20'}
+
   esbuild@0.28.2:
     resolution: {integrity: sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==}
     engines: {node: '>=18'}
@@ -734,6 +741,8 @@ snapshots:
       '@tauri-apps/api': 2.11.1
 
   '@types/estree@1.0.9': {}
+
+  '@typesafe-ai/sdk@0.6.0': {}
 
   esbuild@0.28.2:
     optionalDependencies:

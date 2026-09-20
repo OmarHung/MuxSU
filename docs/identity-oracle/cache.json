@@ -1,0 +1,930 @@
+{
+  "81bdf912ccd8126a4e461bf1f1c66dd2": {
+    "relation": {
+      "type": "score",
+      "score": 1.31,
+      "confidence": 0.44,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.03,
+        "1": 0.63,
+        "2": 0.34
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.88
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.24
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.07
+    }
+  },
+  "cc92ca314ee04c0c325c595d7c80b55f": {
+    "relation": {
+      "type": "score",
+      "score": 0.13,
+      "confidence": 0.8,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.88,
+        "1": 0.12,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.04
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.72
+    }
+  },
+  "81ab8596d90cc72ff73f51ad1743b4f5": {
+    "relation": {
+      "type": "score",
+      "score": 0.07,
+      "confidence": 0.9,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.93,
+        "1": 0.07,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.76
+    }
+  },
+  "6303bf0b4d55d28ac059e781d9d5e923": {
+    "relation": {
+      "type": "score",
+      "score": 0.07,
+      "confidence": 0.89,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.93,
+        "1": 0.07,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.77
+    }
+  },
+  "b3848111b2efb6b7fe3670b26fb2d425": {
+    "relation": {
+      "type": "score",
+      "score": 0.18,
+      "confidence": 0.73,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.83,
+        "1": 0.17,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.04
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.56
+    }
+  },
+  "7cc86d90855df6bf86f705d647c4b6e2": {
+    "relation": {
+      "type": "score",
+      "score": 0.06,
+      "confidence": 0.91,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.94,
+        "1": 0.06,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.62
+    }
+  },
+  "d5f9848c0b429e1dcc635b36e9c77172": {
+    "relation": {
+      "type": "score",
+      "score": 0.12,
+      "confidence": 0.83,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.89,
+        "1": 0.11,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.65
+    }
+  },
+  "1ac25b3bce943601665150147163d97f": {
+    "relation": {
+      "type": "score",
+      "score": 1.21,
+      "confidence": 0.61,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.03,
+        "1": 0.74,
+        "2": 0.23
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.91
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.27
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.07
+    }
+  },
+  "9f2dc356736b4d1e609cf6d6ec54d7bf": {
+    "relation": {
+      "type": "score",
+      "score": 0.02,
+      "confidence": 0.97,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.98,
+        "1": 0.02,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.79
+    }
+  },
+  "a2cc152ce84140964d08d5b6846714f8": {
+    "relation": {
+      "type": "score",
+      "score": 0.03,
+      "confidence": 0.96,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.97,
+        "1": 0.03,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.79
+    }
+  },
+  "4734fef176231537f409ab33a4cfc361": {
+    "relation": {
+      "type": "score",
+      "score": 0.06,
+      "confidence": 0.91,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.94,
+        "1": 0.06,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.58
+    }
+  },
+  "61bf61a895b6d8939e14aa1c4aba16cd": {
+    "relation": {
+      "type": "score",
+      "score": 0.03,
+      "confidence": 0.95,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.97,
+        "1": 0.03,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.7
+    }
+  },
+  "4e76788e9224c23b902215c549d762f6": {
+    "relation": {
+      "type": "score",
+      "score": 0.03,
+      "confidence": 0.95,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.97,
+        "1": 0.03,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.66
+    }
+  },
+  "34e1e307fd16ae407029e4a2ab187cb3": {
+    "relation": {
+      "type": "score",
+      "score": 1.19,
+      "confidence": 0.59,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.04,
+        "1": 0.73,
+        "2": 0.23
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.9
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.26
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.07
+    }
+  },
+  "8961da34f564e8cfbb61d822c18d6f04": {
+    "relation": {
+      "type": "score",
+      "score": 0.01,
+      "confidence": 0.98,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.99,
+        "1": 0.01,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.76
+    }
+  },
+  "5923127b5fee1276825c3c1c17e62310": {
+    "relation": {
+      "type": "score",
+      "score": 0.02,
+      "confidence": 0.97,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.98,
+        "1": 0.02,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.75
+    }
+  },
+  "1b54d3137d004d27108e0bd94d5f0350": {
+    "relation": {
+      "type": "score",
+      "score": 0.11,
+      "confidence": 0.84,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.9,
+        "1": 0.1,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.74
+    }
+  },
+  "30011deb31932578b7ae3c1439866cb3": {
+    "relation": {
+      "type": "score",
+      "score": 1.08,
+      "confidence": 0.42,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.15,
+        "1": 0.61,
+        "2": 0.24
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.91
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.17
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.07
+    }
+  },
+  "e2f5c87638aa40f7e7e2f2f73a3c9725": {
+    "relation": {
+      "type": "score",
+      "score": 0.09,
+      "confidence": 0.86,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.91,
+        "1": 0.09,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.04
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.51
+    }
+  },
+  "87bf1a07d4aeb465fba3ea4562112e6f": {
+    "relation": {
+      "type": "score",
+      "score": 0.03,
+      "confidence": 0.95,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.97,
+        "1": 0.03,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.75
+    }
+  },
+  "f9a275554d93e674b97bd7bef190eed3": {
+    "relation": {
+      "type": "score",
+      "score": 0.04,
+      "confidence": 0.94,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.96,
+        "1": 0.04,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.62
+    }
+  },
+  "f496b09adcdc972d2fb0763c844bda4a": {
+    "relation": {
+      "type": "score",
+      "score": 0.09,
+      "confidence": 0.86,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.91,
+        "1": 0.09,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.55
+    }
+  },
+  "6e0b736f719ce11e75cfa111727875b9": {
+    "relation": {
+      "type": "score",
+      "score": 1.1,
+      "confidence": 0.59,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.09,
+        "1": 0.72,
+        "2": 0.19
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.92
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.19
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.06
+    }
+  },
+  "e47c0ccdb5e5f508431ff82bcc9eb9d4": {
+    "relation": {
+      "type": "score",
+      "score": 0.54,
+      "confidence": 0.31,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.46,
+        "1": 0.54,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.07
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.04
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.59
+    }
+  },
+  "9cfebf6f54c072df5db3e891941a2c8f": {
+    "relation": {
+      "type": "score",
+      "score": 0.9,
+      "confidence": 0.83,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.11,
+        "1": 0.88,
+        "2": 0.01
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.97
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.21
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.05
+    }
+  },
+  "2082e76c842e79124f3eec67fb7cc0a8": {
+    "relation": {
+      "type": "score",
+      "score": 0.46,
+      "confidence": 0.31,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.56,
+        "1": 0.43,
+        "2": 0.01
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.04
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.05
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.23
+    }
+  },
+  "5c46ac2a35f28c34c8d1e1e79bec5a59": {
+    "relation": {
+      "type": "score",
+      "score": 0.54,
+      "confidence": 0.29,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.47,
+        "1": 0.52,
+        "2": 0.01
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.07
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.04
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.2
+    }
+  },
+  "9ef70044d471659ea406f810145f102e": {
+    "relation": {
+      "type": "score",
+      "score": 0.95,
+      "confidence": 0.84,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.08,
+        "1": 0.89,
+        "2": 0.03
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.31
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.07
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.09
+    }
+  },
+  "491fd2595a696cc149223fe6a80626c6": {
+    "relation": {
+      "type": "score",
+      "score": 0.68,
+      "confidence": 0.51,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.33,
+        "1": 0.67,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.04
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.43
+    }
+  },
+  "89225237a9c271e5783cdc575e5c6b70": {
+    "relation": {
+      "type": "score",
+      "score": 0.34,
+      "confidence": 0.49,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.66,
+        "1": 0.34,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.63
+    }
+  },
+  "0444a8509966b2488645436b5ea63e43": {
+    "relation": {
+      "type": "score",
+      "score": 0.34,
+      "confidence": 0.48,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.66,
+        "1": 0.34,
+        "2": 0
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.02
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.03
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.72
+    }
+  },
+  "2d2d0495495df85ba91d0ec5b32e1f10": {
+    "relation": {
+      "type": "score",
+      "score": 1.51,
+      "confidence": 0.26,
+      "legend": {
+        "0": "Two different physical displays. They may share a vendor or even a product code, but they are separate panels, and treating them as one would move one panel's input settings onto the other.",
+        "1": "Impossible to settle from this evidence. The two could be one panel in two display modes, or two separate displays; the person who owns them has to say which.",
+        "2": "One physical display under two identities. The same panel publishes a different EDID product code depending on the display mode it is set to."
+      },
+      "probabilities": {
+        "0": 0.08,
+        "1": 0.33,
+        "2": 0.59
+      }
+    },
+    "sameProductLine": {
+      "type": "noul",
+      "noul": 0.93
+    },
+    "modeChangeExplainsDifference": {
+      "type": "noul",
+      "noul": 0.22
+    },
+    "differentPanelSize": {
+      "type": "noul",
+      "noul": 0.06
+    }
+  }
+}

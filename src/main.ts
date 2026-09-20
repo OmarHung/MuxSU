@@ -119,6 +119,15 @@ interface MonitorIdentityClaim {
   primaryLabel: string;
 }
 
+/** "This display present right now is probably another mode of that shared
+ *  display", from the backend's curated table of multi-identity models. It only
+ *  preselects the merge below; the declaration is still the user's. */
+interface MergeSuggestion {
+  monitorId: string;
+  primaryKey: string;
+  primaryLabel: string;
+}
+
 interface DashboardState {
   platform: string;
   localHost: Platform;
@@ -128,6 +137,7 @@ interface DashboardState {
   shared: SharedMonitorStatus[];
   selectionNotices: string[];
   monitorIdentityClaims?: MonitorIdentityClaim[];
+  mergeSuggestions?: MergeSuggestion[];
   resolvedMonitorIdentities: Record<string, string>;
   localHostName?: string;
 }
@@ -1276,6 +1286,7 @@ function renderMonitorMerge(): void {
   const targets = dashboard.shared.filter((shared) =>
     !present.some((monitor) => sameDisplay(monitor.fingerprint, shared.fingerprint)));
   const claims = dashboard.monitorIdentityClaims ?? [];
+  const suggestions = dashboard.mergeSuggestions ?? [];
   const canMerge = strangers.length > 0 && targets.length > 0;
   if (!canMerge && !claims.length) { container.innerHTML = ""; return; }
 
@@ -1295,19 +1306,28 @@ function renderMonitorMerge(): void {
         </div>
         <button type="button" class="button small" data-unmerge-alias="${escapeHtml(claim.aliasKey)}">${t("settings.mergeUndo")}</button>
       </div>`).join("")}
-      ${(canMerge ? strangers : []).map((monitor) => `<div class="row has-icon">
-        <span class="app-icon"><i data-lucide="monitor-dot"></i></span>
+      ${(canMerge ? strangers : []).map((monitor) => {
+        // A display model known to publish this second identity points the
+        // dropdown at the display it belongs to. Without one the row reads
+        // exactly as it did before, with nothing preselected.
+        const suggested = suggestions.find((suggestion) => suggestion.monitorId === monitor.id
+          && targets.some((target) => target.monitorKey === suggestion.primaryKey));
+        return `<div class="row has-icon">
+        <span class="app-icon${suggested ? " is-accent" : ""}"><i data-lucide="monitor-dot"></i></span>
         <div>
           <div class="row-title">${escapeHtml(describeMonitor(monitor))}</div>
-          <div class="row-sub">${escapeHtml(t("settings.mergeUnidentified"))}</div>
+          <div class="row-sub">${escapeHtml(suggested
+            ? t("settings.mergeSuggested", { name: suggested.primaryLabel })
+            : t("settings.mergeUnidentified"))}</div>
         </div>
         <div class="row-actions">
           <select class="field-select plain-font" data-merge-target="${escapeHtml(monitor.id)}" aria-label="${escapeHtml(t("settings.mergeSelect"))}">
-            ${targets.map((target) => `<option value="${escapeHtml(target.monitorKey)}">${escapeHtml(describeShared(target))}</option>`).join("")}
+            ${targets.map((target) => `<option value="${escapeHtml(target.monitorKey)}"${target.monitorKey === suggested?.primaryKey ? " selected" : ""}>${escapeHtml(describeShared(target))}</option>`).join("")}
           </select>
           <button type="button" class="button small" data-merge-alias="${escapeHtml(monitor.id)}">${t("settings.mergeAction")}</button>
         </div>
-      </div>`).join("")}
+      </div>`;
+      }).join("")}
     </div>`;
 }
 
