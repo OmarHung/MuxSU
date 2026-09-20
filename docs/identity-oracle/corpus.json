@@ -1,0 +1,66 @@
+{
+  "note": "EDID identities MuxSU has actually observed, for the identity-merge oracle. Every entry carries its provenance; nothing here is invented. Add an entry by pasting what `cargo run -p muxsu-core --example diagnose_macos` or a diagnostic report reports for a display. `observedAlongside` lists the identities enumerated in the same scan as this one, and is present only on identities that came from a live enumeration; two identities seen at once are two panels.",
+  "identities": [
+    {
+      "id": "msi-mpg274u-uhd",
+      "manufacturerId": "MSI",
+      "productCode": "3CF0",
+      "productName": "MPG 274U E16M",
+      "serialNumber": null,
+      "serialSource": "macOS reads no serial from this display",
+      "observedResolution": "3840x2160",
+      "observedOn": "macOS",
+      "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20",
+      "observedAlongside": [
+        "asus-vg252q"
+      ]
+    },
+    {
+      "id": "msi-mpg274u-fhd",
+      "manufacturerId": "MSI",
+      "productCode": "7CF0",
+      "productName": "MPG 274U E16M",
+      "serialNumber": null,
+      "serialSource": "macOS reads no serial from this display in either mode",
+      "observedResolution": "1920x1080",
+      "observedOn": "macOS",
+      "provenance": "product-facts.md, recorded from real hardware: the same panel publishes MSI:7CF0 at 1920x1080"
+    },
+    {
+      "id": "asus-vg252q",
+      "manufacturerId": "ACR",
+      "productCode": "0725",
+      "productName": "VG252Q",
+      "serialNumber": "576726074",
+      "serialSource": "EDID 32-bit numeric serial, as macOS reads it",
+      "observedResolution": "1920x1080",
+      "observedOn": "macOS",
+      "provenance": "cargo run -p muxsu-core --example diagnose_macos on an Apple M4 Pro, 2026-09-20; its capabilities string calls itself model(VG251QX)",
+      "observedAlongside": [
+        "msi-mpg274u-uhd"
+      ]
+    },
+    {
+      "id": "aoc-24b2hm2",
+      "manufacturerId": "AOC",
+      "productCode": "2402",
+      "productName": "24B2HM2",
+      "serialNumber": "1GAQ1HA000232",
+      "serialSource": "EDID serial-text descriptor, as Windows WMI SerialNumberID reads it",
+      "observedResolution": "1920x1080",
+      "observedOn": "captured EDID",
+      "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2HM2_HDMI"
+    },
+    {
+      "id": "aoc-24b2w1",
+      "manufacturerId": "AOC",
+      "productCode": "2402",
+      "productName": "24B2W1",
+      "serialNumber": "2885",
+      "serialSource": "EDID 32-bit numeric serial; this EDID carries no serial-text descriptor",
+      "observedResolution": "1920x1080",
+      "observedOn": "captured EDID",
+      "provenance": "crates/muxsu-core/src/edid.rs test fixture AOC_24B2W1_HDMI"
+    }
+  ]
+}

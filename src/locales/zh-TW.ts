@@ -66,6 +66,7 @@ const zhTW: Record<keyof typeof en, string> = {
   "settings.mergeTitle": "同一台螢幕的不同身分",
   "settings.mergeIntro": "有些螢幕在切換顯示模式時會回報不同的識別碼，看起來就像換了一台。如果下面這台其實是清單中某台螢幕的另一個顯示模式，把它們合併起來，輸入設定就不會再重設。",
   "settings.mergeUnidentified": "不屬於任何共用螢幕",
+  "settings.mergeSuggested": "已知是 {name} 的另一個顯示模式 —— 合併前請再確認",
   "settings.mergeSelect": "合併到這台螢幕",
   "settings.mergeAction": "這是同一台",
   "settings.mergeUndo": "取消合併",

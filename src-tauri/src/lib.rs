@@ -4,6 +4,7 @@ mod host_alias;
 mod host_appearance;
 mod host_order;
 mod input_label;
+mod known_identity_groups;
 mod monitor_identity;
 mod tray;
 
@@ -605,6 +606,11 @@ struct DashboardState {
     shared: Vec<SharedMonitorStatus>,
     selection_notices: Vec<String>,
     monitor_identity_claims: Vec<MonitorIdentityClaim>,
+    /// For a display present right now, the one shared display a curated table
+    /// of multi-identity models says it is another mode of. Only ever used to
+    /// preselect the merge the settings page already offers; the user still
+    /// declares it. See `known_identity_groups`.
+    merge_suggestions: Vec<MergeSuggestion>,
     /// Maps the JSON representation of every fingerprint sent to the webview
     /// to the backend-resolved physical-display identity. The frontend only
     /// compares these opaque results; the serial-number and merge rules live
@@ -634,6 +640,51 @@ fn identity_label(fingerprint: &MonitorFingerprint) -> String {
         "{} / {}",
         fingerprint.manufacturer_id, fingerprint.product_code
     )
+}
+
+/// "This display present right now is probably another mode of that shared
+/// display." Carries the keys the settings page already uses to offer a merge.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MergeSuggestion {
+    monitor_id: String,
+    primary_key: String,
+    primary_label: String,
+}
+
+/// The suggestion for each present display that a curated group ties to exactly
+/// one shared display. Displays that are already part of a shared display are
+/// skipped: they have nothing to merge into.
+fn merge_suggestions(
+    settings: &AppSettings,
+    present: &[&MonitorDescriptor],
+    shared: &[SharedMonitorStatus],
+) -> Vec<MergeSuggestion> {
+    let fingerprints = shared
+        .iter()
+        .map(|status| status.fingerprint.clone())
+        .collect::<Vec<_>>();
+    present
+        .iter()
+        .filter(|monitor| {
+            !settings.shared_monitors.iter().any(|selected| {
+                monitor_identity::is_same_display(
+                    &settings.monitor_identity_links,
+                    &selected.fingerprint,
+                    &monitor.fingerprint,
+                )
+            })
+        })
+        .filter_map(|monitor| {
+            let index =
+                known_identity_groups::suggested_primary(&monitor.fingerprint, &fingerprints)?;
+            Some(MergeSuggestion {
+                monitor_id: monitor.id.as_str().to_owned(),
+                primary_key: shared[index].monitor_key.clone(),
+                primary_label: identity_label(&shared[index].fingerprint),
+            })
+        })
+        .collect()
 }
 
 fn monitor_identity_claims(settings: &AppSettings) -> Vec<MonitorIdentityClaim> {
@@ -1520,8 +1571,12 @@ async fn get_dashboard_state(app: AppHandle) -> Result<DashboardState, String> {
 
 fn build_dashboard_state(state: &AppRuntime, app: &AppHandle) -> Result<DashboardState, String> {
     let mut settings = read_settings(state)?;
-    let (monitors, uncontrollable_monitors, shared, selection_notices) =
-        match enumerate_monitor_inventory() {
+    let (monitors, uncontrollable_monitors, shared, selection_notices): (
+        Vec<MonitorDescriptor>,
+        Vec<MonitorDescriptor>,
+        Vec<SharedMonitorStatus>,
+        Vec<String>,
+    ) = match enumerate_monitor_inventory() {
             Ok(inventory) => {
                 diagnostics::remember_inventory(&inventory.detected, &inventory.current_inputs);
                 let changes = reconcile_monitor_selection(&mut settings, &inventory.controllable);
@@ -1649,6 +1704,12 @@ fn build_dashboard_state(state: &AppRuntime, app: &AppHandle) -> Result<Dashboar
         };
     let resolved_monitor_identities =
         resolved_monitor_identities(&settings, &monitors, &uncontrollable_monitors);
+    let present = monitors
+        .iter()
+        .chain(uncontrollable_monitors.iter())
+        .collect::<Vec<_>>();
+    let merge_suggestions = merge_suggestions(&settings, &present, &shared);
+    drop(present);
     Ok(DashboardState {
         platform: std::env::consts::OS,
         local_host: settings.local_host,
@@ -1658,6 +1719,7 @@ fn build_dashboard_state(state: &AppRuntime, app: &AppHandle) -> Result<Dashboar
         shared,
         selection_notices,
         monitor_identity_claims: monitor_identity_claims(&settings),
+        merge_suggestions,
         resolved_monitor_identities,
         local_host_name: state.local_host_name.clone(),
     })
@@ -6664,6 +6726,98 @@ mod tests {
             resolved.get(&alias_json),
             Some(&monitor_key(&primary.fingerprint))
         );
+    }
+
+    fn msi_monitor(product_code: &str) -> MonitorDescriptor {
+        MonitorDescriptor {
+            id: muxsu_core::MonitorId::new(format!("macos:MSI:{product_code}:NO-SERIAL")),
+            fingerprint: MonitorFingerprint::new("MSI", product_code, None::<String>),
+            name: "MPG 274U E16M".to_owned(),
+            ..monitor("msi")
+        }
+    }
+
+    fn shared_status(monitor: &MonitorDescriptor) -> SharedMonitorStatus {
+        SharedMonitorStatus {
+            monitor_key: monitor_key(&monitor.fingerprint),
+            fingerprint: monitor.fingerprint.clone(),
+            name: monitor.name.clone(),
+            ddc_available: false,
+            display_state: SharedDisplayState::Unavailable,
+            status_text: String::new(),
+            connection: None,
+            connection_input_conflict: false,
+        }
+    }
+
+    /// The MSI MPG 274U publishes `MSI:7CF0` once it is set to 1920x1080, which
+    /// reads as a display nobody has shared while the shared `MSI:3CF0` goes
+    /// unreadable. The settings page offers the merge either way; the curated
+    /// table is what lets it point at the right one instead of a bare list.
+    #[test]
+    fn a_known_second_identity_is_matched_to_the_shared_display_it_belongs_to() {
+        let uhd = msi_monitor("3CF0");
+        let fhd = msi_monitor("7CF0");
+        let settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor::from(&uhd)],
+            ..AppSettings::default()
+        };
+
+        let suggestions = merge_suggestions(&settings, &[&fhd], &[shared_status(&uhd)]);
+
+        assert_eq!(
+            suggestions,
+            vec![MergeSuggestion {
+                monitor_id: fhd.id.as_str().to_owned(),
+                primary_key: monitor_key(&uhd.fingerprint),
+                primary_label: "MSI / 3CF0".to_owned(),
+            }]
+        );
+    }
+
+    #[test]
+    fn a_display_that_is_already_the_shared_one_is_not_offered_a_merge() {
+        let uhd = msi_monitor("3CF0");
+        let settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor::from(&uhd)],
+            ..AppSettings::default()
+        };
+
+        assert!(merge_suggestions(&settings, &[&uhd], &[shared_status(&uhd)]).is_empty());
+    }
+
+    /// A display the table knows nothing about leaves the page exactly as it was
+    /// before: the merge is still offered, with nothing preselected.
+    #[test]
+    fn an_unknown_display_gets_no_suggestion() {
+        let shared = msi_monitor("3CF0");
+        let stranger = monitor("some-other-display");
+        let settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor::from(&shared)],
+            ..AppSettings::default()
+        };
+
+        assert!(merge_suggestions(&settings, &[&stranger], &[shared_status(&shared)]).is_empty());
+    }
+
+    /// A merge the user already declared removes the suggestion, so the page
+    /// stops offering what has been settled.
+    #[test]
+    fn a_declared_merge_removes_the_suggestion() {
+        let uhd = msi_monitor("3CF0");
+        let fhd = msi_monitor("7CF0");
+        let settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor::from(&uhd)],
+            monitor_identity_links: monitor_identity::with_link(
+                &[],
+                &fhd.fingerprint,
+                Some(&uhd.fingerprint),
+                1,
+            ),
+            ..AppSettings::default()
+        };
+
+        assert!(merge_suggestions(&settings, &[&fhd], &[shared_status(&uhd)]).is_empty());
     }
 
     /// Windows reads the MSI MPG 274U's serial number and macOS reads none, so
