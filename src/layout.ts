@@ -178,7 +178,9 @@ function helpTab(releaseRows: string): string {
     <div class="form-section">
       <h3 class="group-title">${t("about.title")}</h3>
       <dl class="list about-grid">
-        <div class="row about-item"><dt><i data-lucide="user-round"></i>${t("about.developer")}</dt><dd>Henry Hsu</dd></div>
+        <!-- MuxSU's author, as the LICENCE names them. DisplayMux and Henry Hsu
+             are credited in the upstream note below this list. -->
+        <div class="row about-item"><dt><i data-lucide="user-round"></i>${t("about.developer")}</dt><dd>Omar Hung</dd></div>
         <div class="row about-item"><dt><i data-lucide="github"></i>GitHub</dt><dd><a href="https://github.com/OmarHung/MuxSU" data-external-url>OmarHung/MuxSU<i data-lucide="external-link"></i></a></dd></div>
         <div class="row about-item"><dt><i data-lucide="activity"></i>${t("about.version")}</dt><dd id="app-version" aria-live="polite">${t("about.loading")}</dd></div>
       </dl>
