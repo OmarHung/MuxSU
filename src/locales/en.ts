@@ -243,6 +243,7 @@ const en = {
   "switcher.noHosts": "No configured hosts are available",
   "switcher.navigationHint": "↑↓ to move · Enter to switch",
   "switcher.closeHint": "Esc to close",
+  "switchNotice.dismiss": "Got it",
   "switcher.preparing": "Preparing to switch",
   "switcher.preparingDetail": "Checking the safest available switching path.",
   "switcher.waking": "Waking {name}.",

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-hide-switch-notice"
+description = "Enables the hide_switch_notice command without any pre-configured scope."
+commands.allow = ["hide_switch_notice"]
+
+[[permission]]
+identifier = "deny-hide-switch-notice"
+description = "Denies the hide_switch_notice command without any pre-configured scope."
+commands.deny = ["hide_switch_notice"]

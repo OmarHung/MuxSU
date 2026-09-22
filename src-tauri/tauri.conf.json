@@ -24,6 +24,20 @@
         "center": true
       },
       {
+        "label": "switch-notice",
+        "title": "MuxSU",
+        "url": "switch-notice.html",
+        "width": 380,
+        "height": 190,
+        "resizable": false,
+        "fullscreen": false,
+        "center": true,
+        "visible": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true
+      },
+      {
         "label": "host-switcher",
         "title": "MuxSU Host Switcher",
         "url": "host-switcher.html",

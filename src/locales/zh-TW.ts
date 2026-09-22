@@ -113,6 +113,7 @@ const zhTW: Record<keyof typeof en, string> = {
   "switcher.title": "切換共用螢幕", "switcher.noDisplay": "尚未選擇共用螢幕", "switcher.hostListAria": "可選擇的主機",
   "switcher.inputUnset": "尚未設定輸入", "switcher.local": "這台裝置", "switcher.showing": "目前顯示中", "switcher.select": "選取", "switcher.noHosts": "目前沒有可用的已設定主機",
   "switcher.navigationHint": "↑↓ 移動 · Enter 切換", "switcher.closeHint": "Esc 關閉", "switcher.preparing": "正在準備切換",
+  "switchNotice.dismiss": "知道了",
   "switcher.preparingDetail": "正在確認最安全的可用切換路徑。", "switcher.waking": "正在喚醒 {name}。", "switcher.waiting": "最多等待 {seconds} 秒，確認 {name} 是否就緒。",
   "switcher.remoteFallback": "正在請求 {name} 代為切換。", "switcher.switching": "正在變更共用螢幕輸入。", "switcher.failed": "無法切換",
   "switcher.previewDisplay": "共用螢幕預覽", "switcher.previewWindows": "這台 Windows 電腦", "switcher.previewMac": "工作用 Mac mini",

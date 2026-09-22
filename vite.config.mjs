@@ -15,6 +15,7 @@ export default defineConfig({
       input: {
         main: "index.html",
         hostSwitcher: "host-switcher.html",
+        switchNotice: "switch-notice.html",
       },
     },
   },

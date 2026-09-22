@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "switch-notice",
+  "description": "Minimal permissions for the MuxSU switch notice panel",
+  "windows": ["switch-notice"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-set-size",
+    "core:window:allow-center",
+    "allow-get-switch-notice",
+    "allow-hide-switch-notice"
+  ]
+}

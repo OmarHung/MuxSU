@@ -1219,6 +1219,22 @@ fn hide_host_switcher(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// What the window has to say about the last switch from the tray menu. The
+/// window is shown before it has finished loading, so it reads the message
+/// rather than only listening for it.
+#[tauri::command]
+fn get_switch_notice() -> Option<tray::SwitchNotice> {
+    tray::last_switch_notice()
+}
+
+#[tauri::command]
+fn hide_switch_notice(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(tray::NOTICE_WINDOW) {
+        window.hide().map_err(user_error)?;
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn check_host_switcher_shortcut(
     shortcut: String,
@@ -3431,6 +3447,8 @@ fn record_active_route(
 
 /// Frontend event telling the dashboard to re-read which host is active.
 const ACTIVE_ROUTE_CHANGED_EVENT: &str = "active-route-changed";
+/// Carries a `tray::SwitchNotice` to the window that shows it.
+const SWITCH_NOTICE_EVENT: &str = "switch-notice";
 
 /// How long a confirmed switch outranks live reads of the display's input.
 /// Displays can keep reporting the previous input for several seconds while
@@ -6830,6 +6848,8 @@ pub fn run() -> anyhow::Result<()> {
             remove_shared_monitor,
             get_settings,
             get_host_switcher_state,
+            get_switch_notice,
+            hide_switch_notice,
             get_host_order,
             set_host_order,
             get_host_names,

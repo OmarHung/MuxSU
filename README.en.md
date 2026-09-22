@@ -169,6 +169,8 @@ On Windows, closing or minimizing the window leaves the app running in the syste
 
 The tray menu (the menu bar icon on macOS) switches too: "Switch every display to" lists each host, and each shared display has a submenu of its own, with a check next to the host it is showing.
 
+A switch made from the menu has no window to report back to, so the menu itself carries the progress: its heading becomes "Switching to <host>…", every host below it is unclickable, and clicking again does not queue a second switch. A switch still running after 1.2 seconds also opens a small panel naming the host; one that fails replaces it with the display that failed and why. Got it, Enter or Esc dismisses it.
+
 ### Global Host Switcher
 
 With "Global host switcher" enabled in Settings › Shortcut & Startup, a shortcut (`Ctrl/Cmd + Alt + Space` by default) summons a small window for handing the shared monitor to another host, without returning to the main window first. You can record your own shortcut; the app checks it against common application shortcuts before accepting it.

@@ -22,6 +22,8 @@ const COMMANDS: &[&str] = &[
     "reset_settings",
     "exchange_host_layout",
     "hide_host_switcher",
+    "get_switch_notice",
+    "hide_switch_notice",
     "check_host_switcher_shortcut",
     "complete_onboarding",
     "get_input_options",

@@ -435,10 +435,22 @@
           "markdownDescription": "Enables the get_settings command without any pre-configured scope."
         },
         {
+          "description": "Enables the get_switch_notice command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-get-switch-notice",
+          "markdownDescription": "Enables the get_switch_notice command without any pre-configured scope."
+        },
+        {
           "description": "Enables the hide_host_switcher command without any pre-configured scope.",
           "type": "string",
           "const": "allow-hide-host-switcher",
           "markdownDescription": "Enables the hide_host_switcher command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the hide_switch_notice command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-hide-switch-notice",
+          "markdownDescription": "Enables the hide_switch_notice command without any pre-configured scope."
         },
         {
           "description": "Enables the install_update command without any pre-configured scope.",
@@ -663,10 +675,22 @@
           "markdownDescription": "Denies the get_settings command without any pre-configured scope."
         },
         {
+          "description": "Denies the get_switch_notice command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-get-switch-notice",
+          "markdownDescription": "Denies the get_switch_notice command without any pre-configured scope."
+        },
+        {
           "description": "Denies the hide_host_switcher command without any pre-configured scope.",
           "type": "string",
           "const": "deny-hide-host-switcher",
           "markdownDescription": "Denies the hide_host_switcher command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the hide_switch_notice command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-hide-switch-notice",
+          "markdownDescription": "Denies the hide_switch_notice command without any pre-configured scope."
         },
         {
           "description": "Denies the install_update command without any pre-configured scope.",
