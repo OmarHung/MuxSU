@@ -52,6 +52,12 @@ You can share more than one monitor; each host stores its own input port for eac
 - A global shortcut can summon a small host picker even while the main window is hidden: number keys pick a host, Tab changes the target display.
 - The tray (the menu bar on macOS) switches too: every display to one host, or each display on its own.
 
+**Display maintenance (Re-seat signal is experimental)**
+
+- When the picture does not arrive on an input that is already correct, the display can be sent out through a paired host's input and straight back, so it re-establishes the link to this computer. A display's built-in USB hub or KVM follows the active input, so the keyboard and mouse come back with it.
+- Once the display leaves this computer, only the host it is then showing can switch it back. MuxSU asks that host to answer first, and moves nothing when it does not. Turn this on under Experimental in settings; it is hidden by default.
+- Re-detection reads which inputs the display accepts, and which one it is showing, from the display again. What is stored is kept when nothing can be read. It only reads, and is not experimental.
+
 **Also**
 
 - Each host can wear an icon and a colour (12 icons, 10 colours), which the switch centre, the switcher and settings use to tell hosts apart.

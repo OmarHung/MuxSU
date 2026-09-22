@@ -2,29 +2,33 @@ use crate::DisplayInput;
 
 /// Parses the value list declared for VCP 0x60 without probing inputs by switching them.
 pub(crate) fn parse_input_sources(capabilities: &[u8]) -> Vec<DisplayInput> {
-    let text = String::from_utf8_lossy(capabilities);
-    let Some(vcp_body) = group_body_after_token(&text, "vcp") else {
-        return Vec::new();
-    };
-    let Some(input_body) = group_body_after_token(vcp_body, "60") else {
-        return Vec::new();
-    };
+    declared_values(capabilities, "60")
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|value| DisplayInput::new(value).ok())
+        .collect()
+}
 
-    let mut inputs = input_body
+/// The sorted, de-duplicated one-byte values a `vcp(...)` group declares for
+/// one feature code.
+fn declared_values(capabilities: &[u8], code: &str) -> Option<Vec<u32>> {
+    let text = String::from_utf8_lossy(capabilities);
+    let vcp_body = group_body_after_token(&text, "vcp")?;
+    let body = group_body_after_token(vcp_body, code)?;
+
+    let mut values = body
         .split_ascii_whitespace()
         .filter_map(|token| {
             let token = token.trim_matches(|character: char| !character.is_ascii_hexdigit());
             if token.is_empty() || token.len() > 2 {
                 return None;
             }
-            u32::from_str_radix(token, 16)
-                .ok()
-                .and_then(|value| DisplayInput::new(value).ok())
+            u32::from_str_radix(token, 16).ok()
         })
         .collect::<Vec<_>>();
-    inputs.sort_by_key(|input| input.value());
-    inputs.dedup();
-    inputs
+    values.sort_unstable();
+    values.dedup();
+    Some(values)
 }
 
 fn group_body_after_token<'a>(text: &'a str, token: &str) -> Option<&'a str> {

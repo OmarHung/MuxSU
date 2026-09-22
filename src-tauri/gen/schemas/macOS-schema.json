@@ -471,6 +471,12 @@
           "markdownDescription": "Enables the probe_peer command without any pre-configured scope."
         },
         {
+          "description": "Enables the redetect_display command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-redetect-display",
+          "markdownDescription": "Enables the redetect_display command without any pre-configured scope."
+        },
+        {
           "description": "Enables the refresh_host_presence command without any pre-configured scope.",
           "type": "string",
           "const": "allow-refresh-host-presence",
@@ -499,6 +505,12 @@
           "type": "string",
           "const": "allow-reset-settings",
           "markdownDescription": "Enables the reset_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the resync_display_input command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-resync-display-input",
+          "markdownDescription": "Enables the resync_display_input command without any pre-configured scope."
         },
         {
           "description": "Enables the save_diagnostic_report command without any pre-configured scope.",
@@ -711,6 +723,12 @@
           "markdownDescription": "Denies the probe_peer command without any pre-configured scope."
         },
         {
+          "description": "Denies the redetect_display command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-redetect-display",
+          "markdownDescription": "Denies the redetect_display command without any pre-configured scope."
+        },
+        {
           "description": "Denies the refresh_host_presence command without any pre-configured scope.",
           "type": "string",
           "const": "deny-refresh-host-presence",
@@ -739,6 +757,12 @@
           "type": "string",
           "const": "deny-reset-settings",
           "markdownDescription": "Denies the reset_settings command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the resync_display_input command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-resync-display-input",
+          "markdownDescription": "Denies the resync_display_input command without any pre-configured scope."
         },
         {
           "description": "Denies the save_diagnostic_report command without any pre-configured scope.",

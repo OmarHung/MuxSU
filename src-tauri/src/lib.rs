@@ -19,6 +19,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex as StdMutex, OnceLock, RwLock,
     },
+    thread,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -27,9 +28,9 @@ use muxsu_core::{
     derive_pairing_key, AgentAction, AgentClient, AgentDisplayRoute, AgentHostInput, AgentResponse,
     AgentServer, DestinationHost, DiscoveredPeer, DisplayInput, DisplayMuxError, DisplayMuxProfile,
     DisplayMuxService, HostAlias, HostAppearance, InputLabel, LocalHostIdentity, MacAddress,
-    MdnsPeerDiscovery, MonitorControl, MonitorDescriptor, MonitorFingerprint, MonitorIdentityLink,
-    PeerDiscovery, PeerEndpoint, ResolutionSource, SwitchMode, SwitchOutcome, WakeTarget,
-    AGENT_PROTOCOL_VERSION, DEFAULT_AGENT_PORT,
+    MdnsPeerDiscovery, MonitorControl, MonitorDescriptor, MonitorFingerprint, MonitorId,
+    MonitorIdentityLink, PeerDiscovery, PeerEndpoint, ResolutionSource, SwitchMode, SwitchOutcome,
+    WakeTarget, AGENT_PROTOCOL_VERSION, DEFAULT_AGENT_PORT,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{ipc::Channel, AppHandle, Emitter, Manager, State};
@@ -4663,6 +4664,459 @@ fn label_error_text(error: input_label::LabelError) -> String {
     }
 }
 
+/// Sends one shared display out through a paired host's input and straight
+/// back to this computer's, so it re-establishes the link — and a built-in
+/// USB hub or KVM, which follows the active input rather than the panel,
+/// re-binds along with it.
+///
+/// The way back is the whole problem. A display answers DDC/CI on the input
+/// it is showing and no other, so the moment this computer leaves the screen
+/// it cannot write to that display at all: the return has to be made by the
+/// host that is on screen by then. That is why the only input worth going out
+/// through belongs to a paired host, why that host's agent has to answer
+/// immediately before the display is sent anywhere, and why this refuses
+/// rather than strand a display where nothing can recall it from.
+#[tauri::command]
+async fn resync_display_input(
+    monitor_id: String,
+    app: AppHandle,
+    state: State<'_, AppRuntime>,
+) -> Result<OperationResult, String> {
+    let settings = read_settings(&state)?;
+    let selected = find_shared_monitor(&settings, &monitor_id)?.clone();
+    let expected = selected.local_input.ok_or_else(|| {
+        ui_text(
+            "尚未設定這台電腦使用的螢幕輸入",
+            "The display input for this computer is not configured",
+        )
+        .to_owned()
+    })?;
+    let partners = resync_partners(&settings, &selected);
+    if partners.is_empty() {
+        return Err(match UiLocale::current() {
+            UiLocale::TraditionalChinese => format!(
+                "{} 沒有可以把畫面送回來的主機。畫面離開這台電腦之後，只有當下在畫面上的那台主機能把它切回來，所以這需要另一台已配對、而且在這台螢幕上設定了輸入的主機。",
+                selected.name
+            ),
+            UiLocale::English => format!(
+                "Nothing could bring {} back. Once the display leaves this computer, only the host it is then showing can switch it back, so this needs a paired host with an input set on this display.",
+                selected.name
+            ),
+        });
+    }
+
+    // Asked right now rather than read from the last scan: the display is
+    // about to be sent somewhere only that host can recall it from.
+    let mut silent = Vec::new();
+    let mut ready = None;
+    for (peer, input) in &partners {
+        match request_peer(&settings, peer, AgentAction::Ping).await {
+            Ok(_) => {
+                ready = Some((peer.clone(), *input));
+                break;
+            }
+            Err(detail) => silent.push(format!("{}（{detail}）", peer.name)),
+        }
+    }
+    let Some((peer, via)) = ready else {
+        let silent = silent.join("；");
+        return Err(match UiLocale::current() {
+            UiLocale::TraditionalChinese => format!(
+                "沒有主機可以把畫面切回來，所以沒有動 {}。{silent}",
+                selected.name
+            ),
+            UiLocale::English => format!(
+                "No host could switch the display back, so {} was left alone. {silent}",
+                selected.name
+            ),
+        });
+    };
+
+    // Out. This computer is the one on screen, so this is the one write it
+    // can still make.
+    run_display_task(app.clone(), {
+        let settings = settings.clone();
+        let selected = selected.clone();
+        move |_state| leave_for(&settings, &selected, expected, via)
+    })
+    .await?;
+    // The display is that host's until it comes back, and every window says
+    // which host a display is on. A return that fails must not leave them all
+    // claiming this computer.
+    record_active_route(&state, &selected.fingerprint, &peer.id)?;
+    sleep(RESYNC_DWELL).await;
+
+    // Back. The host now on screen is the one that can still write to the
+    // display, so it is asked first rather than as a fallback. This
+    // computer's own write proves nothing here: the platform controller
+    // trusts a write whose read-back it cannot take, and it cannot take one
+    // while the display is showing somebody else — which is exactly when
+    // this runs.
+    let asked = request_return(&settings, &peer, &selected, expected).await;
+    sleep(RETURN_SETTLE).await;
+    let mut back = confirmed_back(&app, &settings, &selected, expected).await;
+    if !back {
+        // Last resort: the displays that do answer an input they are not
+        // showing, and the host that went away in the last two seconds.
+        back = nudged_back(&app, &settings, &selected, expected).await;
+    }
+    if !back {
+        return match asked {
+            Err(detail) => Err(stranded_text(&selected, &peer, via, expected, &detail)),
+            Ok(()) => Ok(OperationResult {
+                title: match UiLocale::current() {
+                    UiLocale::TraditionalChinese => format!("已請 {} 把畫面切回來", peer.name),
+                    UiLocale::English => format!("{} was asked to switch it back", peer.name),
+                },
+                detail: stranded_text(
+                    &selected,
+                    &peer,
+                    via,
+                    expected,
+                    ui_text(
+                        "這台電腦還讀不到畫面已經回來",
+                        "this computer still cannot read the display as back",
+                    ),
+                ),
+                peer_woken: false,
+                warning: true,
+            }),
+        };
+    }
+    record_active_route(&state, &selected.fingerprint, "local")?;
+    announce_active_input(&state, &selected.fingerprint, expected);
+    if let Err(error) = app.emit(ACTIVE_ROUTE_CHANGED_EVENT, ()) {
+        tracing::warn!(error = %error, "unable to notify windows of a re-seated display");
+    }
+
+    let port = noted_input_label(&settings, &selected, expected);
+    Ok(OperationResult {
+        title: ui_text("已重新送出訊號", "Signal re-seated").to_owned(),
+        detail: match UiLocale::current() {
+            UiLocale::TraditionalChinese => format!(
+                "{} 已切到 {}（{}）再切回 {port}。",
+                selected.name,
+                peer.name,
+                noted_input_label(&settings, &selected, via)
+            ),
+            UiLocale::English => format!(
+                "{} went to {} ({}) and back to {port}.",
+                selected.name,
+                peer.name,
+                noted_input_label(&settings, &selected, via)
+            ),
+        },
+        peer_woken: false,
+        warning: false,
+    })
+}
+
+/// How long the display is left on the other host's input. It has to lock
+/// onto that signal for leaving it again to mean anything to its own USB —
+/// and its DDC/CI bus has to settle before that host is asked to move it
+/// again, because a display that has just changed input answers badly.
+const RESYNC_DWELL: Duration = Duration::from_millis(2_500);
+
+/// The paired hosts that could bring this display back, with the input each
+/// one sits on. A host with no input here cannot be switched to at all, and
+/// one on the same input as this computer is no way out of it.
+fn resync_partners(
+    settings: &AppSettings,
+    selected: &SelectedMonitor,
+) -> Vec<(HostRoute, DisplayInput)> {
+    settings
+        .peers
+        .iter()
+        .filter_map(|peer| {
+            let input = peer.input_for(&selected.fingerprint)?;
+            (Some(input) != selected.local_input).then(|| (peer.clone(), input))
+        })
+        .collect()
+}
+
+/// Sends the display to `via`, refusing unless this computer is what it is
+/// showing: a display showing somebody else is somebody else's picture to
+/// move, and this computer would not be the one that could move it back.
+fn leave_for(
+    settings: &AppSettings,
+    selected: &SelectedMonitor,
+    expected: DisplayInput,
+    via: DisplayInput,
+) -> Result<(), String> {
+    let (controller, target) = live_display(settings, selected)?;
+    let current = controller.read_input(&target).map_err(core_user_error)?;
+    if current != expected {
+        return Err(match UiLocale::current() {
+            UiLocale::TraditionalChinese => format!(
+                "{} 目前顯示的是 {}，不是這台電腦的輸入。請先切換回這台電腦再重新送出訊號。",
+                selected.name,
+                noted_input_label(settings, selected, current)
+            ),
+            UiLocale::English => format!(
+                "{} is showing {}, not this computer's input. Switch it back to this computer before re-seating the signal.",
+                selected.name,
+                noted_input_label(settings, selected, current)
+            ),
+        });
+    }
+    controller
+        .write_input(&target, via)
+        .map_err(core_user_error)
+}
+
+/// How long the display is given to settle before it is read back.
+const RETURN_SETTLE: Duration = Duration::from_millis(900);
+
+/// How many times the host on screen is asked before the display is called
+/// stranded. A display that has just changed input answers DDC/CI badly for
+/// a few seconds — Windows reports `ERROR_GRAPHICS_DDCCI_INVALID_MESSAGE_COMMAND`
+/// and the host's read fails before it ever writes, observed on an MSI MPG
+/// 274U — and this ask is the only thing that brings the picture back, so one
+/// bad moment must not be the end of it.
+const RETURN_ATTEMPTS: u32 = 3;
+const RETURN_RETRY_DELAY: Duration = Duration::from_millis(1_500);
+
+/// Asks the host now on screen to put the display back on this computer's
+/// input. It is the only host that can: a display answers DDC/CI on the input
+/// it is showing and no other.
+async fn request_return(
+    settings: &AppSettings,
+    peer: &HostRoute,
+    selected: &SelectedMonitor,
+    expected: DisplayInput,
+) -> Result<(), String> {
+    let mut refusal = ui_text("沒有送出要求", "the request was never sent").to_owned();
+    for attempt in 0..RETURN_ATTEMPTS {
+        match ask_to_switch(settings, peer, selected, expected).await {
+            Ok(()) => return Ok(()),
+            Err(detail) => {
+                tracing::info!(
+                    peer = peer.name.as_str(),
+                    attempt = attempt + 1,
+                    error = %detail,
+                    "the host on screen could not switch the display back yet"
+                );
+                refusal = detail;
+                if attempt + 1 < RETURN_ATTEMPTS {
+                    sleep(RETURN_RETRY_DELAY).await;
+                }
+            }
+        }
+    }
+    Err(refusal)
+}
+
+async fn ask_to_switch(
+    settings: &AppSettings,
+    peer: &HostRoute,
+    selected: &SelectedMonitor,
+    expected: DisplayInput,
+) -> Result<(), String> {
+    let monitor = resolve_switch_monitor_field(settings, peer, &selected.fingerprint).await?;
+    request_peer(
+        settings,
+        peer,
+        AgentAction::SwitchInput {
+            monitor,
+            input: expected,
+        },
+    )
+    .await?;
+    Ok(())
+}
+
+/// Whether the display can be read from here *and* reads as this computer's
+/// input. This is the one place where "could not tell" must not be taken for
+/// "it came back": a display this computer cannot read is, as a rule, a
+/// display that is showing somebody else.
+async fn confirmed_back(
+    app: &AppHandle,
+    settings: &AppSettings,
+    selected: &SelectedMonitor,
+    expected: DisplayInput,
+) -> bool {
+    let settings = settings.clone();
+    let selected = selected.clone();
+    run_display_task(app.clone(), move |_state| {
+        let (controller, target) = live_display(&settings, &selected)?;
+        Ok(matches!(controller.read_input(&target), Ok(current) if current == expected))
+    })
+    .await
+    .unwrap_or(false)
+}
+
+/// One write from this computer, then the same clean-reading test. Only the
+/// displays that answer an input they are not showing can be moved this way,
+/// which is why it runs after the host on screen has already been asked.
+async fn nudged_back(
+    app: &AppHandle,
+    settings: &AppSettings,
+    selected: &SelectedMonitor,
+    expected: DisplayInput,
+) -> bool {
+    let settings = settings.clone();
+    let selected = selected.clone();
+    run_display_task(app.clone(), move |_state| {
+        let (controller, target) = live_display(&settings, &selected)?;
+        let _ = controller.write_input(&target, expected);
+        thread::sleep(RETURN_SETTLE);
+        Ok(matches!(controller.read_input(&target), Ok(current) if current == expected))
+    })
+    .await
+    .unwrap_or(false)
+}
+
+/// The display is on the other host's input and neither host could move it.
+/// Whoever reads this is looking at the wrong computer, so it names the two
+/// ways out rather than describing the fault.
+fn stranded_text(
+    selected: &SelectedMonitor,
+    peer: &HostRoute,
+    via: DisplayInput,
+    expected: DisplayInput,
+    detail: &str,
+) -> String {
+    let label = |input| input_label(selected.vendor_indexed_inputs, input);
+    match UiLocale::current() {
+        UiLocale::TraditionalChinese => format!(
+            "{} 已切到 {}（{}），而且切不回 {}。請用螢幕上的按鍵切回來，或在 {} 上用 MuxSU 切回這台電腦。（{detail}）",
+            selected.name,
+            peer.name,
+            label(via),
+            label(expected),
+            peer.name
+        ),
+        UiLocale::English => format!(
+            "{} went to {} ({}) and would not come back to {}. Use the display's own buttons, or switch it back to this computer from MuxSU on {}. ({detail})",
+            selected.name,
+            peer.name,
+            label(via),
+            label(expected),
+            peer.name
+        ),
+    }
+}
+
+/// Reads one shared display's inputs again from the display itself, replacing
+/// what this computer learned before.
+///
+/// The stored list is only let go of once a fresh one has been read. A display
+/// answers the host it is showing and no other, so a reading taken while it is
+/// elsewhere says nothing — and what is stored may have come from the paired
+/// host that could read the display when this one could not.
+#[tauri::command]
+async fn redetect_display(monitor_id: String, app: AppHandle) -> Result<OperationResult, String> {
+    let result = run_display_task(app.clone(), move |state| {
+        let mut settings = read_settings(state)?;
+        let selected = find_shared_monitor(&settings, &monitor_id)?.clone();
+        let controller = platform_controller().map_err(core_user_error)?;
+        let present = controller.enumerate().map_err(core_user_error)?;
+        let monitor = present_display(&settings, &selected, &present)?.clone();
+
+        let mut probe = selected.clone();
+        probe.supported_inputs = None;
+        probe.vendor_indexed_inputs = false;
+        refresh_selected_input_data(&controller, &monitor, &mut probe).map_err(core_user_error)?;
+        let read_a_list = probe.supported_inputs.is_some();
+        if !read_a_list {
+            probe.supported_inputs = selected.supported_inputs.clone();
+            probe.vendor_indexed_inputs = selected.vendor_indexed_inputs;
+        }
+        let local_input = probe.local_input;
+        let count = probe.supported_inputs.as_ref().map_or(0, Vec::len);
+
+        let Some(stored) = settings
+            .shared_monitors
+            .iter_mut()
+            .find(|stored| stored.fingerprint.matches_exactly(&selected.fingerprint))
+        else {
+            return Err(display_not_found());
+        };
+        let inputs_changed = stored.supported_inputs != probe.supported_inputs;
+        *stored = probe;
+        let settings = store_settings(state, settings)?;
+        // Paired hosts are told a display's input list once. A re-detection
+        // that read a different list makes what they were told wrong, so let
+        // the next scan tell them again.
+        if inputs_changed {
+            if let Ok(mut announced) = state.announced_input_lists.lock() {
+                announced.remove(&monitor_key(&selected.fingerprint));
+            }
+        }
+
+        let port = local_input.map_or_else(
+            || ui_text("尚未確認", "not confirmed yet").to_owned(),
+            |input| noted_input_label(&settings, &selected, input),
+        );
+        Ok(if read_a_list {
+            OperationResult {
+                title: ui_text("已重新偵測", "Re-detected").to_owned(),
+                detail: match UiLocale::current() {
+                    UiLocale::TraditionalChinese => {
+                        format!("{} 回報 {count} 個輸入，這台電腦的輸入為 {port}。", selected.name)
+                    }
+                    UiLocale::English => format!(
+                        "{} reported {count} inputs; this computer's input is {port}.",
+                        selected.name
+                    ),
+                },
+                peer_woken: false,
+                warning: false,
+            }
+        } else {
+            OperationResult {
+                title: ui_text("讀不到輸入清單", "No input list was read").to_owned(),
+                detail: match UiLocale::current() {
+                    UiLocale::TraditionalChinese => format!(
+                        "{} 這次沒有回報它接受的輸入，先前的設定已保留。螢幕顯示其他電腦時通常讀不到。",
+                        selected.name
+                    ),
+                    UiLocale::English => format!(
+                        "{} did not report the inputs it accepts this time, so what was stored is kept. A display showing another computer usually cannot be read.",
+                        selected.name
+                    ),
+                },
+                peer_woken: false,
+                warning: true,
+            }
+        })
+    })
+    .await?;
+    if let Err(error) = app.emit(INPUT_LABELS_CHANGED_EVENT, ()) {
+        tracing::warn!(error = %error, "unable to notify windows of a re-detected display");
+    }
+    Ok(result)
+}
+
+/// The display present right now that a maintenance action on this shared
+/// display may act on, with the controller that reaches it. Picked by exactly
+/// the rule a switch uses, so maintenance can never reach a display the user
+/// did not name.
+fn live_display(
+    settings: &AppSettings,
+    selected: &SelectedMonitor,
+) -> Result<(impl MonitorControl, MonitorId), String> {
+    let controller = platform_controller().map_err(core_user_error)?;
+    let present = controller.enumerate().map_err(core_user_error)?;
+    let id = present_display(settings, selected, &present)?.id.clone();
+    Ok((controller, id))
+}
+
+fn present_display<'a>(
+    settings: &AppSettings,
+    selected: &SelectedMonitor,
+    present: &'a [MonitorDescriptor],
+) -> Result<&'a MonitorDescriptor, String> {
+    let identities =
+        monitor_identity::identities_for(&settings.monitor_identity_links, &selected.fingerprint);
+    let fingerprint = switch_target(&identities, present).map_err(core_user_error)?;
+    present
+        .iter()
+        .find(|monitor| fingerprint.matches_exactly(&monitor.fingerprint))
+        .ok_or_else(display_not_found)
+}
+
+/// Every input of this display that a host here is known to use.
 async fn receive_input_labels_notice(app: AppHandle, labels: Vec<InputLabel>) -> AgentResponse {
     let applied = tauri::async_runtime::spawn_blocking(move || {
         // Serialize with dashboard scans, which write back a settings snapshot.
@@ -6859,6 +7313,8 @@ pub fn run() -> anyhow::Result<()> {
             set_input_label,
             set_monitor_identity_link,
             set_local_input,
+            resync_display_input,
+            redetect_display,
             reset_settings,
             exchange_host_layout,
             hide_host_switcher,
@@ -8219,6 +8675,64 @@ mod tests {
                 .value(),
             0x0f
         );
+    }
+
+    /// Only a paired host that has an input on *this* display can bring it
+    /// back, and a host on the same input as this computer is no way out of
+    /// that input.
+    #[test]
+    fn the_hosts_that_could_bring_a_display_back_are_the_ones_with_a_port_on_it() {
+        let shared = monitor("shared");
+        let elsewhere = monitor("elsewhere");
+        let mut settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor {
+                local_input: Some(DisplayInput::new(0x11).unwrap()),
+                ..SelectedMonitor::from(&shared)
+            }],
+            ..AppSettings::default()
+        };
+        let mut partner = peer_route("partner");
+        partner.set_input_for(&shared.fingerprint, DisplayInput::new(0x0f).ok());
+        let mut on_the_same_input = peer_route("same-input");
+        on_the_same_input.set_input_for(&shared.fingerprint, DisplayInput::new(0x11).ok());
+        let mut only_elsewhere = peer_route("elsewhere-only");
+        only_elsewhere.set_input_for(&elsewhere.fingerprint, DisplayInput::new(0x12).ok());
+        settings.peers = vec![partner, on_the_same_input, only_elsewhere];
+
+        let partners = resync_partners(&settings, &settings.shared_monitors[0]);
+
+        assert_eq!(
+            partners
+                .iter()
+                .map(|(peer, input)| (peer.id.as_str(), input.value()))
+                .collect::<Vec<_>>(),
+            vec![("partner", 0x0f)]
+        );
+    }
+
+    /// A display left on the other host's input is the one failure the user
+    /// cannot see this app to fix, so the message has to name where it went,
+    /// where it should be, and the two ways to move it.
+    #[test]
+    fn a_stranded_display_is_reported_with_both_inputs_and_a_way_back() {
+        let shared = monitor("shared");
+        let settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor::from(&shared)],
+            ..AppSettings::default()
+        };
+
+        let message = stranded_text(
+            &settings.shared_monitors[0],
+            &peer_route("partner"),
+            DisplayInput::new(0x0f).unwrap(),
+            DisplayInput::new(0x11).unwrap(),
+            "the agent did not answer",
+        );
+
+        assert!(message.contains("HDMI 1"), "{message}");
+        assert!(message.contains("DP"), "{message}");
+        assert!(message.contains("own buttons"), "{message}");
+        assert!(message.contains("Peer"), "{message}");
     }
 
     #[test]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-resync-display-input"
+description = "Enables the resync_display_input command without any pre-configured scope."
+commands.allow = ["resync_display_input"]
+
+[[permission]]
+identifier = "deny-resync-display-input"
+description = "Denies the resync_display_input command without any pre-configured scope."
+commands.deny = ["resync_display_input"]
