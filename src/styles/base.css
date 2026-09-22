@@ -41,7 +41,8 @@ code, kbd, .mono { font-family: var(--font-mono); }
 .lucide { width: 17px; height: 17px; stroke-width: 1.9; flex: none; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
-.is-spinning { animation: spin 0.9s linear infinite; }
+.is-spinning,
+.icon-button.is-checking .lucide { animation: spin 0.9s linear infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0ms !important; animation-duration: 0ms !important; }
@@ -133,9 +134,14 @@ code, kbd, .mono { font-family: var(--font-mono); }
   color: var(--text-2);
   transition: transform var(--fast) var(--ease), color var(--fast);
 }
+/* An even glyph in an even button. 17px of icon in a 34px button leaves 8.5px
+   of margin, so the drawing lands half a pixel off the grid the button's rim is
+   drawn on — measured in the app, the ink sat 0.5px right of and below the
+   circle's middle. Standing still that reads as softness; turning, the smear
+   changes with the angle and reads as a wobble. */
+.icon-button .lucide { width: 18px; height: 18px; }
 .icon-button:hover:not(:disabled) { color: var(--text); transform: translateY(-1px); }
 .icon-button.has-update { color: #fff; background: var(--accent); }
-.icon-button.is-checking .lucide { animation: spin 0.9s linear infinite; }
 
 .text-button {
   padding: 0;

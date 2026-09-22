@@ -1337,11 +1337,21 @@ function matrixCellHtml(shared: SharedMonitorStatus, route: SwitchRoute, isActiv
   </button>`;
 }
 
+/** Full-width closing punctuation that leaves its right half of the em empty. */
+const TRAILING_FULL_WIDTH = /[）〉》」』】〕｝。、，；：]$/u;
+
+/** Sets the status pill's label, trimming the empty half em a full-width
+    closing bracket would otherwise add to the capsule's right side. */
+function setAgentPillText(target: Element, label: string): void {
+  target.textContent = label;
+  target.classList.toggle("trim-trailing-em", TRAILING_FULL_WIDTH.test(label));
+}
+
 function renderState(): void {
   renderSummary();
   const pill = document.querySelector("#agent-pill");
   pill?.classList.toggle("is-ready", dashboard.agentConfigured);
-  if (pill) pill.querySelector("span:last-child")!.textContent = isPreview ? t("dashboard.preview") : dashboard.agentConfigured ? t("dashboard.agentReady") : t("dashboard.agentMissing");
+  if (pill) setAgentPillText(pill.querySelector("span:last-child")!, isPreview ? t("dashboard.preview") : dashboard.agentConfigured ? t("dashboard.agentReady") : t("dashboard.agentMissing"));
   setInput("#shared-key", settings.sharedKey);
   setInput("#wait-seconds", String(settings.waitSeconds));
   const autostart = document.querySelector<HTMLInputElement>("#autostart");

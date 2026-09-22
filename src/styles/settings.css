@@ -249,7 +249,8 @@
 .sub-row output { color: var(--text); font: 600 12px var(--font-mono); }
 .order-buttons { display: flex; gap: 2px; }
 .order-buttons .icon-button { width: 28px; height: 28px; background: var(--glass-weak); }
-.order-buttons .lucide { width: 15px; height: 15px; }
+/* 28px button, so an even glyph again — see .icon-button .lucide in base.css. */
+.order-buttons .lucide { width: 16px; height: 16px; }
 
 .peer-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 

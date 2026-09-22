@@ -6,6 +6,11 @@
   height: 100vh;
 }
 
+/* Every box in this row is a whole number of pixels tall, and the line heights
+   below are pixels rather than the inherited 1.45 ratio, which lands on values
+   like 18.85. A fraction anywhere in the row is centred into a fraction
+   everywhere: the icons inside the round buttons used to start on a half-lit
+   device pixel, and a 1.35px stroke smeared that way reads as off-centre. */
 .toolbar {
   position: relative;
   z-index: 5;
@@ -20,6 +25,7 @@
   font-size: 15px;
   font-weight: 700;
   letter-spacing: -0.01em;
+  line-height: 20px;
 }
 
 .seg {
@@ -32,6 +38,7 @@
 .seg-button {
   min-width: 76px;
   padding: 7px 20px;
+  line-height: 18px;
   border: 0;
   border-radius: 999px;
   background: none;
@@ -59,13 +66,22 @@
   align-items: center;
   gap: 8px;
   max-width: 260px;
-  padding: 7px 14px 7px 12px;
+  height: 34px;
+  padding: 0 14px 0 12px;
   border-radius: 999px;
   color: var(--text-2);
   font-size: 12.5px;
   font-weight: 500;
+  line-height: 18px;
 }
 .agent-pill span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Full-width closing punctuation — ）」。 — is drawn in the left half of its em
+   and advances the other half as empty space. A label ending in one therefore
+   sits about half an em left of where the padding puts it, and the capsule
+   reads lopsided. Giving that half em back is what CJK typesetting does at the
+   end of a line, and what `text-spacing-trim: trim-end` will do once it is
+   available in both engines. */
+.agent-pill .trim-trailing-em { margin-right: -0.5em; }
 .agent-pill.is-ready .status-dot { background: var(--ok-glow); box-shadow: 0 0 8px var(--ok-glow); }
 
 .workspace {
