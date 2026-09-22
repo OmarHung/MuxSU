@@ -220,6 +220,7 @@ let isRecordingShortcut = false;
 let shortcutStatus: { kind: "checking" | "available" | "conflict"; text: string } | null = null;
 
 const releaseHistoryFallback = [
+  { date: "2026-09-22", version: "v0.8.1", url: "https://github.com/OmarHung/MuxSU/releases/tag/v0.8.1" },
   { date: "2026-09-22", version: "v0.8.0", url: "https://github.com/OmarHung/MuxSU/releases/tag/v0.8.0" },
   { date: "2026-09-20", version: "v0.7.2", url: "https://github.com/OmarHung/MuxSU/releases/tag/v0.7.2" },
   { date: "2026-09-20", version: "v0.7.1", url: "https://github.com/OmarHung/MuxSU/releases/tag/v0.7.1" },
