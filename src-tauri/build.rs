@@ -30,6 +30,8 @@ const COMMANDS: &[&str] = &[
     "install_update",
     "get_dashboard_state",
     "probe_peer",
+    "get_host_presence",
+    "refresh_host_presence",
     "wake_peer",
     "switch_host",
     "diagnostics_status",

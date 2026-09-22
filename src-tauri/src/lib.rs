@@ -3,6 +3,7 @@ mod diagnostics_upload;
 mod host_alias;
 mod host_appearance;
 mod host_order;
+mod host_presence;
 mod input_label;
 mod known_identity_groups;
 mod monitor_identity;
@@ -15,12 +16,13 @@ use std::{
     path::{Path, PathBuf},
     str::FromStr,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex as StdMutex, OnceLock, RwLock,
     },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
+use host_presence::{Check as PresenceCheck, HostPresence};
 use muxsu_core::{
     derive_pairing_key, AgentAction, AgentClient, AgentDisplayRoute, AgentHostInput, AgentResponse,
     AgentServer, DestinationHost, DiscoveredPeer, DisplayInput, DisplayMuxError, DisplayMuxProfile,
@@ -34,7 +36,10 @@ use tauri::{ipc::Channel, AppHandle, Emitter, Manager, State};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as AutostartManagerExt};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_updater::UpdaterExt;
-use tokio::{sync::Mutex, time::sleep};
+use tokio::{
+    sync::Mutex,
+    time::{sleep, timeout, Instant},
+};
 
 static NONCE_COUNTER: AtomicU64 = AtomicU64::new(1);
 static UI_LOCALE: AtomicU64 = AtomicU64::new(0);
@@ -473,6 +478,18 @@ struct AppRuntime {
     /// Prevents the immediate sender and periodic retry loop from delivering
     /// the same durable queue entry concurrently.
     notices_in_flight: Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
+    /// Which displays this computer could last see, so a paired host's `Ping`
+    /// can be answered without scanning displays inside the reply.
+    attached_monitors: Arc<std::sync::Mutex<AttachedSnapshot>>,
+    /// Whether a scan started to refresh `attached_monitors` is still running,
+    /// so a host polling every second asks for one scan rather than one each
+    /// time.
+    attached_scan_running: Arc<AtomicBool>,
+    /// What the last check said about each paired host, keyed by peer id.
+    host_presence: Arc<std::sync::Mutex<HashMap<String, HostPresence>>>,
+    /// Whether a round of presence checks is already in flight, so two windows
+    /// asking at once cost one round of pings rather than two.
+    presence_check_running: Arc<AtomicBool>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -765,6 +782,21 @@ fn resolved_monitor_identities(
 enum MonitorSelectionChange {
     SelectedOnlyMonitor { name: String },
     RefreshedMetadata { name: String },
+}
+
+/// How long this computer's own view of which displays are attached stays
+/// good enough to answer a paired host with. A cable is moved by hand, so a
+/// reading this recent still describes it; an older one is reported as unknown
+/// rather than passed off as current, since "no display" would otherwise read
+/// as a missing cable.
+const ATTACHED_SNAPSHOT_TTL_MS: u64 = 90_000;
+
+/// The displays this computer could see when its last scan ran.
+#[derive(Clone, Debug, Default)]
+struct AttachedSnapshot {
+    fingerprints: Vec<MonitorFingerprint>,
+    /// Unix milliseconds of that scan; zero before the first one.
+    taken_at_ms: u64,
 }
 
 struct MonitorInventory {
@@ -1097,6 +1129,7 @@ async fn get_host_switcher_state(app: AppHandle) -> Result<HostSwitcherState, St
     run_display_task(app, move |state| {
         let mut settings = read_settings(state)?;
         if let Ok(inventory) = enumerate_monitor_inventory() {
+            remember_attached_monitors(state, &inventory);
             let ports_filled = fill_unset_local_inputs(&mut settings, &inventory);
             if ports_filled {
                 ensure_host_input_history(&mut settings);
@@ -1575,6 +1608,7 @@ fn build_dashboard_state(state: &AppRuntime, app: &AppHandle) -> Result<Dashboar
         match enumerate_monitor_inventory() {
             Ok(inventory) => {
                 diagnostics::remember_inventory(&inventory.detected, &inventory.current_inputs);
+                remember_attached_monitors(state, &inventory);
                 let changes = reconcile_monitor_selection(&mut settings, &inventory.controllable);
                 // A display may be shared before it answers DDC/CI, and its
                 // inputs cannot be read then. Nothing read them afterwards, so
@@ -1773,6 +1807,136 @@ fn shared_monitor_status_text(
     }
 }
 
+/// What the last check said about each paired host, without asking anything
+/// now. A window draws with this straight away and refreshes in the
+/// background, so opening it never waits on a sleeping host's connect timeout.
+#[tauri::command]
+fn get_host_presence(state: State<'_, AppRuntime>) -> Result<Vec<HostPresence>, String> {
+    let settings = read_settings(&state)?;
+    Ok(known_host_presence(&state, &settings))
+}
+
+/// Asks every paired host at once whether it answers and which shared displays
+/// it can see, then remembers the answers.
+///
+/// The hosts are asked in parallel: one asleep holds its check for the client's
+/// connect timeout, and a row of those in turn would outlast the interval the
+/// windows call this on.
+#[tauri::command]
+async fn refresh_host_presence(state: State<'_, AppRuntime>) -> Result<Vec<HostPresence>, String> {
+    let settings = Arc::new(read_settings(&state)?);
+    // One round at a time. The main window and the switcher overlay both ask,
+    // and a round waiting on a sleeping host easily outlasts the gap between
+    // two asks; without this they would each ping every host.
+    if settings.peers.is_empty() {
+        return Ok(known_host_presence(&state, &settings));
+    }
+    let Some(_round) = CheckRound::start(&state.presence_check_running) else {
+        return Ok(known_host_presence(&state, &settings));
+    };
+    let checks: Vec<_> = settings
+        .peers
+        .iter()
+        .cloned()
+        .map(|peer| {
+            let settings = Arc::clone(&settings);
+            tauri::async_runtime::spawn(async move {
+                let answer = request_peer(&settings, &peer, AgentAction::Ping).await;
+                (peer.id, answer)
+            })
+        })
+        .collect();
+    let mut answers = Vec::with_capacity(checks.len());
+    for check in checks {
+        // A check that could not even be joined says nothing about its host,
+        // so that host keeps whatever was last known about it.
+        if let Ok(answer) = check.await {
+            answers.push(answer);
+        }
+    }
+    record_host_presence(&state, &settings, answers, unix_time_ms());
+    Ok(known_host_presence(&state, &settings))
+}
+
+/// Holds the "a round is in flight" flag for as long as one is, and clears it
+/// however the round ends. A window closed mid-round drops the command's
+/// future, which would otherwise leave the flag set and every later round
+/// reading the cache for the rest of the session.
+struct CheckRound<'a>(&'a AtomicBool);
+
+impl<'a> CheckRound<'a> {
+    /// `None` when a round is already running.
+    fn start(running: &'a AtomicBool) -> Option<Self> {
+        (!running.swap(true, Ordering::SeqCst)).then_some(Self(running))
+    }
+}
+
+impl Drop for CheckRound<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
+/// Every paired host, in the order they are stored, including those nothing
+/// has asked yet. Hosts that are no longer paired are dropped as this reads.
+fn known_host_presence(state: &AppRuntime, settings: &AppSettings) -> Vec<HostPresence> {
+    let peer_ids: Vec<String> = settings.peers.iter().map(|peer| peer.id.clone()).collect();
+    let Ok(mut known) = state.host_presence.lock() else {
+        return peer_ids
+            .iter()
+            .map(|id| HostPresence::unknown(id))
+            .collect();
+    };
+    host_presence::forget_unpaired(&mut known, &peer_ids);
+    host_presence::listed(&known, &peer_ids)
+}
+
+/// Remembers how a round of checks ended.
+fn record_host_presence(
+    state: &AppRuntime,
+    settings: &AppSettings,
+    answers: Vec<(String, Result<AgentResponse, String>)>,
+    now_ms: u64,
+) {
+    let Ok(mut known) = state.host_presence.lock() else {
+        return;
+    };
+    for (peer_id, answer) in answers {
+        let check = match answer {
+            Ok(response) => PresenceCheck::Answered {
+                attached: peer_attached_monitor_keys(settings, &response),
+            },
+            Err(detail) => PresenceCheck::Silent { detail },
+        };
+        let updated = host_presence::recorded(known.get(&peer_id), &peer_id, check, now_ms);
+        known.insert(peer_id, updated);
+    }
+}
+
+/// The shared displays a paired host reported seeing, as this computer's own
+/// `monitor_key`s, so the windows can answer "is this display on that host"
+/// display by display. A display it sees but nothing shares here has nowhere
+/// to be shown and is dropped.
+fn peer_attached_monitor_keys(
+    settings: &AppSettings,
+    response: &AgentResponse,
+) -> Option<Vec<String>> {
+    let attached = response.attached_monitors.as_ref()?;
+    Some(
+        attached
+            .iter()
+            .filter_map(|fingerprint| {
+                let index = shared_monitor_index_for_peer(
+                    &settings.shared_monitors,
+                    &settings.monitor_identity_links,
+                    fingerprint,
+                )?;
+                Some(monitor_key(&settings.shared_monitors[index].fingerprint))
+            })
+            .collect(),
+    )
+}
+
 #[tauri::command]
 async fn probe_peer(
     peer_id: String,
@@ -1781,7 +1945,16 @@ async fn probe_peer(
     let settings = read_settings(&state)?;
     let peer = find_peer(&settings, &peer_id)?;
     let peer_name = peer.name.clone();
-    let response = request_peer(&settings, peer, AgentAction::Ping).await?;
+    // The button the user pressed is also a presence check: its answer belongs
+    // in the host list beside it, whichever way it went.
+    let answer = request_peer(&settings, peer, AgentAction::Ping).await;
+    record_host_presence(
+        &state,
+        &settings,
+        vec![(peer_id.clone(), answer.clone())],
+        unix_time_ms(),
+    );
+    let response = answer?;
     let adoption = adopt_peer_routes(&state, &peer_id, &response)?;
     Ok(OperationResult {
         title: match UiLocale::current() {
@@ -2192,24 +2365,42 @@ async fn prepare_automatic_switch(
     }
 }
 
+/// How often a waking host is polled while the wait lasts.
+const PEER_READY_POLL_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Waits for a waking host to answer, for at most the user's wait budget.
+///
+/// The budget is a deadline, not an attempt count: a host that is unreachable
+/// rather than merely asleep leaves every poll hanging until its own connect
+/// and read timeouts expire, so counting attempts would keep the waiting
+/// dialog up for several times the number of seconds it promises.
 async fn wait_until_peer_ready(settings: &AppSettings, peer: &HostRoute) -> Result<(), String> {
-    let attempts = settings.wait_seconds.clamp(5, 120);
-    for _ in 0..attempts {
-        sleep(Duration::from_secs(1)).await;
-        if request_peer(settings, peer, AgentAction::Ping)
-            .await
-            .is_ok()
-        {
+    let budget = settings.wait_seconds.clamp(5, 120);
+    let deadline = Instant::now() + Duration::from_secs(budget);
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        sleep(PEER_READY_POLL_INTERVAL.min(remaining)).await;
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        if matches!(
+            timeout(remaining, request_peer(settings, peer, AgentAction::Ping)).await,
+            Ok(Ok(_))
+        ) {
             return Ok(());
         }
     }
     Err(match UiLocale::current() {
         UiLocale::TraditionalChinese => {
-            format!("{} 在送出喚醒訊號後 {} 秒內仍沒有回應", peer.name, attempts)
+            format!("{} 在送出喚醒訊號後 {} 秒內仍沒有回應", peer.name, budget)
         }
         UiLocale::English => format!(
             "{} did not respond within {} seconds after the wake signal",
-            peer.name, attempts
+            peer.name, budget
         ),
     })
 }
@@ -3018,6 +3209,16 @@ async fn restart_agent(state: &AppRuntime, app: &AppHandle) -> Result<(), String
                                         .collect::<Vec<_>>()
                                 })
                                 .unwrap_or_default();
+                            // What this computer can see of its own displays,
+                            // so the asking host can tell "asleep" from "up,
+                            // but nothing plugged into that display".
+                            let attached_monitors = snapshot.as_ref().and_then(|settings| {
+                                let state = app.try_state::<AppRuntime>()?;
+                                attached_shared_monitors(&state, settings, unix_time_ms())
+                            });
+                            if attached_monitors.is_none() {
+                                refresh_attached_monitors_soon(&app);
+                            }
                             let (
                                 host_order,
                                 host_order_updated_at_ms,
@@ -3050,6 +3251,7 @@ async fn restart_agent(state: &AppRuntime, app: &AppHandle) -> Result<(), String
                                 .to_owned(),
                                 display_route: display_routes.first().cloned(),
                                 display_routes,
+                                attached_monitors,
                                 protocol_version: AGENT_PROTOCOL_VERSION,
                                 host_order,
                                 host_order_updated_at_ms,
@@ -5478,6 +5680,101 @@ fn monitor_inventory<C: MonitorControl>(
     })
 }
 
+/// Records which displays a scan just saw, so a paired host's `Ping` can be
+/// answered without scanning displays inside the reply. Enumeration is the
+/// only thing that knows whether a cable is there, so every scan feeds this.
+fn remember_attached_monitors(state: &AppRuntime, inventory: &MonitorInventory) {
+    let snapshot = AttachedSnapshot {
+        fingerprints: inventory
+            .detected
+            .iter()
+            .map(|monitor| monitor.fingerprint.clone())
+            .collect(),
+        taken_at_ms: unix_time_ms(),
+    };
+    if let Ok(mut stored) = state.attached_monitors.lock() {
+        *stored = snapshot;
+    }
+}
+
+/// The shared displays this computer can see right now, for the reply to a
+/// paired host's `Ping`. `None` when the last scan is too old to answer for:
+/// the reply then says nothing about displays, which the asking host shows as
+/// unknown.
+///
+/// Only displays shared here are reported. They are the ones already named in
+/// everything paired hosts exchange, and the only ones the asking host has
+/// anywhere to show.
+fn attached_shared_monitors(
+    state: &AppRuntime,
+    settings: &AppSettings,
+    now_ms: u64,
+) -> Option<Vec<MonitorFingerprint>> {
+    let snapshot = state.attached_monitors.lock().ok()?.clone();
+    shared_monitors_seen_in(&snapshot, settings, now_ms)
+}
+
+/// The shared displays `snapshot` saw, or `None` when it is too old to answer
+/// for. Split out from `attached_shared_monitors` so the rule that decides
+/// between "not attached" and "unknown" can be tested on its own.
+fn shared_monitors_seen_in(
+    snapshot: &AttachedSnapshot,
+    settings: &AppSettings,
+    now_ms: u64,
+) -> Option<Vec<MonitorFingerprint>> {
+    if snapshot.taken_at_ms == 0
+        || now_ms.saturating_sub(snapshot.taken_at_ms) > ATTACHED_SNAPSHOT_TTL_MS
+    {
+        return None;
+    }
+    Some(
+        settings
+            .shared_monitors
+            .iter()
+            .filter(|selected| {
+                snapshot.fingerprints.iter().any(|seen| {
+                    monitor_identity::is_same_display(
+                        &settings.monitor_identity_links,
+                        &selected.fingerprint,
+                        seen,
+                    )
+                })
+            })
+            .map(|selected| selected.fingerprint.clone())
+            .collect(),
+    )
+}
+
+/// Starts a scan to refresh what `attached_shared_monitors` reports, unless
+/// one is already running.
+///
+/// Answering a `Ping` never waits for it. A host waking up is pinged once a
+/// second, and holding each reply for a DDC/CI scan would make the host look
+/// slower to answer than it is; the reply says "unknown" and the next one,
+/// moments later, carries the fresh reading.
+fn refresh_attached_monitors_soon(app: &AppHandle) {
+    let Some(runtime) = app.try_state::<AppRuntime>() else {
+        return;
+    };
+    let running = Arc::clone(&runtime.attached_scan_running);
+    if running.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let scanned = run_display_task(app, |state| {
+            let inventory = enumerate_monitor_inventory().map_err(core_user_error)?;
+            remember_attached_monitors(state, &inventory);
+            Ok(())
+        })
+        .await;
+        if let Err(error) = scanned {
+            tracing::debug!(error = %error, "unable to refresh which displays are attached");
+        }
+        running.store(false, Ordering::SeqCst);
+    });
+}
+
 /// Re-derives each shared display's active route from the input it just
 /// reported, so a switch made outside this app (from another host, the
 /// display's own buttons, or a cable swap) shows up on the next refresh.
@@ -6428,6 +6725,10 @@ pub fn run() -> anyhow::Result<()> {
                 announced_input_lists: Arc::new(std::sync::Mutex::new(
                     std::collections::HashSet::new(),
                 )),
+                attached_monitors: Arc::new(std::sync::Mutex::new(AttachedSnapshot::default())),
+                attached_scan_running: Arc::new(AtomicBool::new(false)),
+                host_presence: Arc::new(std::sync::Mutex::new(HashMap::new())),
+                presence_check_running: Arc::new(AtomicBool::new(false)),
                 notices_in_flight: Arc::new(std::sync::Mutex::new(
                     std::collections::HashSet::new(),
                 )),
@@ -6549,6 +6850,8 @@ pub fn run() -> anyhow::Result<()> {
             install_update,
             get_dashboard_state,
             probe_peer,
+            get_host_presence,
+            refresh_host_presence,
             wake_peer,
             switch_host,
             diagnostics_status,
@@ -6728,6 +7031,159 @@ mod tests {
         assert_eq!(
             resolved.get(&alias_json),
             Some(&monitor_key(&primary.fingerprint))
+        );
+    }
+
+    /// A host that is unreachable rather than asleep leaves every poll hanging
+    /// until the agent client's own timeouts expire. Counting polls instead of
+    /// seconds kept the waiting dialog up for several times the promised wait.
+    #[tokio::test(start_paused = true)]
+    async fn waiting_for_a_peer_never_outlasts_the_configured_seconds() {
+        // Accepted by the backlog but never answered, so each poll hangs.
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let settings = AppSettings {
+            shared_key: "pairing-password".to_owned(),
+            wait_seconds: 45,
+            ..AppSettings::default()
+        };
+        let peer = HostRoute {
+            address: address.ip().to_string(),
+            port: address.port(),
+            ..peer_route("peer")
+        };
+
+        let started = Instant::now();
+        assert!(wait_until_peer_ready(&settings, &peer).await.is_err());
+
+        assert!(started.elapsed() <= Duration::from_secs(settings.wait_seconds));
+    }
+
+    fn seen(fingerprints: &[&MonitorFingerprint], taken_at_ms: u64) -> AttachedSnapshot {
+        AttachedSnapshot {
+            fingerprints: fingerprints.iter().map(|value| (*value).clone()).collect(),
+            taken_at_ms,
+        }
+    }
+
+    /// "That host sees no display" and "that host has not said" look the same
+    /// on the wire but mean opposite things to somebody about to switch, so a
+    /// scan too old to answer for reports nothing rather than an empty list.
+    #[test]
+    fn a_scan_too_old_to_answer_for_reports_nothing_rather_than_no_display() {
+        let shared = monitor("shared");
+        let settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor::from(&shared)],
+            ..AppSettings::default()
+        };
+        let now = ATTACHED_SNAPSHOT_TTL_MS * 3;
+
+        let fresh = seen(&[&shared.fingerprint], now - ATTACHED_SNAPSHOT_TTL_MS);
+        let stale = seen(&[&shared.fingerprint], now - ATTACHED_SNAPSHOT_TTL_MS - 1);
+
+        assert_eq!(
+            shared_monitors_seen_in(&fresh, &settings, now),
+            Some(vec![shared.fingerprint.clone()])
+        );
+        assert_eq!(shared_monitors_seen_in(&stale, &settings, now), None);
+        assert_eq!(
+            shared_monitors_seen_in(&AttachedSnapshot::default(), &settings, now),
+            None
+        );
+    }
+
+    /// A shared display the scan did not see is the case this exists for: the
+    /// host is up and that display is not on it.
+    #[test]
+    fn only_the_shared_displays_a_scan_saw_are_reported() {
+        let attached = monitor("attached");
+        let unplugged = monitor("unplugged");
+        let not_shared = monitor("not-shared");
+        let settings = AppSettings {
+            shared_monitors: vec![
+                SelectedMonitor::from(&attached),
+                SelectedMonitor::from(&unplugged),
+            ],
+            ..AppSettings::default()
+        };
+
+        let reported = shared_monitors_seen_in(
+            &seen(&[&attached.fingerprint, &not_shared.fingerprint], 1_000),
+            &settings,
+            1_000,
+        );
+
+        assert_eq!(reported, Some(vec![attached.fingerprint]));
+    }
+
+    /// A display with two identities reaches a scan under either of them, and
+    /// the user has already said they are one panel.
+    #[test]
+    fn a_display_seen_under_a_merged_identity_counts_as_attached() {
+        let uhd = msi_monitor("3CF0");
+        let fhd = msi_monitor("7CF0");
+        let settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor::from(&uhd)],
+            monitor_identity_links: monitor_identity::with_link(
+                &[],
+                &fhd.fingerprint,
+                Some(&uhd.fingerprint),
+                1,
+            ),
+            ..AppSettings::default()
+        };
+
+        let reported = shared_monitors_seen_in(&seen(&[&fhd.fingerprint], 1_000), &settings, 1_000);
+
+        assert_eq!(reported, Some(vec![uhd.fingerprint]));
+    }
+
+    #[test]
+    fn a_peer_that_says_nothing_about_displays_leaves_them_unknown() {
+        let shared = monitor("shared");
+        let settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor::from(&shared)],
+            ..AppSettings::default()
+        };
+
+        let silent = AgentResponse::default();
+        let sees_none = AgentResponse {
+            attached_monitors: Some(Vec::new()),
+            ..AgentResponse::default()
+        };
+
+        assert_eq!(peer_attached_monitor_keys(&settings, &silent), None);
+        assert_eq!(
+            peer_attached_monitor_keys(&settings, &sees_none),
+            Some(Vec::new())
+        );
+    }
+
+    /// The reply names displays by the fingerprints that host reads, which are
+    /// not always the ones this computer reads for the same panel.
+    #[test]
+    fn a_peers_displays_are_reported_under_this_computers_own_keys() {
+        let uhd = msi_monitor("3CF0");
+        let fhd = msi_monitor("7CF0");
+        let elsewhere = monitor("elsewhere");
+        let settings = AppSettings {
+            shared_monitors: vec![SelectedMonitor::from(&uhd)],
+            monitor_identity_links: monitor_identity::with_link(
+                &[],
+                &fhd.fingerprint,
+                Some(&uhd.fingerprint),
+                1,
+            ),
+            ..AppSettings::default()
+        };
+        let response = AgentResponse {
+            attached_monitors: Some(vec![fhd.fingerprint, elsewhere.fingerprint]),
+            ..AgentResponse::default()
+        };
+
+        assert_eq!(
+            peer_attached_monitor_keys(&settings, &response),
+            Some(vec![monitor_key(&uhd.fingerprint)])
         );
     }
 

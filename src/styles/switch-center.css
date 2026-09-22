@@ -25,7 +25,14 @@
 button.switch-all-host:hover:not(:disabled) { transform: translateY(-1px); }
 .switch-all-host:disabled { opacity: 0.45; }
 .switch-all-host .swatch { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
-.switch-all-host.is-showing .swatch { background: #fff; box-shadow: none; }
+.switch-all-host.is-showing .swatch { background: var(--c-ink, #fff); box-shadow: none; }
+/* On this host as far as anything knows, but nothing can see it: outlined
+   rather than lit, like the keys under a display. */
+.switch-all-host.is-unconfirmed {
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 45%, transparent);
+  color: var(--text-2);
+  cursor: help;
+}
 
 .view-toggle {
   display: flex;
@@ -145,7 +152,7 @@ button.switch-all-host:hover:not(:disabled) { transform: translateY(-1px); }
   height: 100%;
   overflow: hidden;
   border-radius: 9px;
-  color: #fff;
+  color: var(--c-ink, #fff);
   background:
     radial-gradient(90% 120% at 15% 0%, color-mix(in srgb, var(--c, #8e8e93) 40%, white) 0%, transparent 55%),
     radial-gradient(80% 100% at 100% 100%, color-mix(in srgb, var(--c, #8e8e93) 60%, black) 0%, transparent 60%),
@@ -167,7 +174,7 @@ button.switch-all-host:hover:not(:disabled) { transform: translateY(-1px); }
   margin-top: 8px;
   padding: 3px 10px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
+  background: color-mix(in srgb, var(--c-ink, #fff) 22%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
   font: 600 11.5px var(--font-mono);
 }
@@ -222,6 +229,7 @@ button.source-key:hover:not(:disabled) .source-action { color: var(--c); }
 .source-key:disabled { opacity: 0.45; }
 
 .host-chip {
+  position: relative;
   display: grid;
   place-items: center;
   width: 30px;
@@ -258,8 +266,8 @@ button.source-key:hover:not(:disabled) .source-action { color: var(--c); }
 }
 
 .source-key.is-active { cursor: default; }
-.source-key.is-active .host-chip { background: rgba(255, 255, 255, 0.24); color: #fff; }
-.source-key.is-active .source-copy small, .source-key.is-active .source-action { color: rgba(255, 255, 255, 0.85); }
+.source-key.is-active .host-chip { background: color-mix(in srgb, var(--c-ink, #fff) 24%, transparent); color: var(--c-ink, #fff); }
+.source-key.is-active .source-copy small, .source-key.is-active .source-action { color: color-mix(in srgb, var(--c-ink, #fff) 85%, transparent); }
 
 /* Four or more hosts: each key stands upright so a row still fits. */
 .source-keys.is-stacked .source-key {
@@ -348,8 +356,8 @@ button.matrix-cell:hover:not(:disabled) {
 }
 button.matrix-cell:hover:not(:disabled) small { color: var(--c); }
 .matrix-cell:disabled { opacity: 0.5; }
-.matrix-cell.is-active { color: #fff; }
-.matrix-cell.is-active small { color: rgba(255, 255, 255, 0.86); }
+.matrix-cell.is-active { color: var(--c-ink, #fff); }
+.matrix-cell.is-active small { color: color-mix(in srgb, var(--c-ink, #fff) 86%, transparent); }
 .matrix-cell.is-unset {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px var(--sep);
@@ -379,3 +387,46 @@ button.matrix-cell:hover:not(:disabled) small { color: var(--c); }
 .monitor-panel.is-empty .panel-head { align-self: stretch; }
 .empty-copy strong { display: block; font-size: 17px; font-weight: 650; }
 .empty-copy p { max-width: 420px; margin: 6px auto 14px; color: var(--text-2); font-size: 13px; }
+
+/* ── Host standing ─────────────────────────────────────────────────────── */
+
+/* Whether a host answers, on the chip it wears everywhere: filled while it is
+   up, hollow until something has asked it. */
+.presence-dot {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--glass-strong);
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.presence-dot.is-online { background: var(--ok-glow); }
+.presence-dot.is-offline { background: var(--text-3); }
+.presence-dot.is-unknown { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-3); }
+.source-key.is-active .presence-dot, .matrix-host .presence-dot { border-color: transparent; }
+
+/* Why a host cannot be counted on for this display, under its port. */
+.source-note {
+  display: block;
+  overflow: hidden;
+  color: var(--warn);
+  font: 600 11px var(--font-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.source-key.is-active .source-note { color: color-mix(in srgb, var(--c-ink, #fff) 92%, transparent); }
+
+/* A cell that would still switch, but whose host cannot see this display. */
+.matrix-cell.is-unconfirmed small { color: var(--warn); }
+.matrix-cell.is-unconfirmed { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--warn) 35%, transparent); }
+/* The host a display is set to, while that cannot be seen to be true: named,
+   outlined, never lit. A filled key is this window's way of saying "this is
+   what you are looking at", which is exactly what is in doubt. */
+.matrix-cell.is-unconfirmed[aria-current], .source-key.is-unconfirmed {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--c) 45%, transparent);
+}
+.source-key.is-unconfirmed { cursor: help; }
+.source-key.is-unconfirmed .source-action { color: var(--warn); }

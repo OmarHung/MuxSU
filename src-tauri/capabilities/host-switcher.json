@@ -6,8 +6,10 @@
   "permissions": [
     "core:event:allow-listen",
     "core:event:allow-unlisten",
+    "allow-get-host-presence",
     "allow-get-host-switcher-state",
     "allow-hide-host-switcher",
+    "allow-refresh-host-presence",
     "allow-set-locale",
     "allow-switch-host"
   ]

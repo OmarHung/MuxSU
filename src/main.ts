@@ -1,6 +1,6 @@
 import {
   Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, createIcons, Download, ExternalLink, Github, Info,
-  KeyRound, Keyboard, Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, Plus,
+  GripVertical, KeyRound, Keyboard, Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, Plus,
   RefreshCw, RotateCcw, Save, Search, SunMoon, Trash2, TriangleAlert, UserRound, Zap,
 } from "lucide";
 import { getVersion } from "@tauri-apps/api/app";
@@ -140,6 +140,21 @@ interface DashboardState {
   mergeSuggestions?: MergeSuggestion[];
   resolvedMonitorIdentities: Record<string, string>;
   localHostName?: string;
+}
+
+/** What the backend's last check said about one paired host. */
+interface HostPresence {
+  peerId: string;
+  online: boolean;
+  /** Unix ms of the last completed check; 0 when nothing has asked yet. */
+  checkedAtMs: number;
+  /** Unix ms that host last answered; 0 when it never has. */
+  lastSeenAtMs: number;
+  /** `monitorKey` of every shared display that host says it can see, or null
+   *  when it did not say — which is never the same as "it sees none". */
+  attachedMonitors: string[] | null;
+  /** Why the last check failed; empty while online. */
+  detail: string;
 }
 
 interface DiscoveredPeer {
@@ -290,7 +305,7 @@ const themePreference = initializeTheme();
 app.innerHTML = appShellHtml({ releaseRows: releaseHistoryRows(releaseHistoryFallback), minSharedKeyLength: MIN_SHARED_KEY_LENGTH });
 
 const iconSet = {
-  Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, Github, Info, KeyRound, Keyboard,
+  Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, Github, GripVertical, Info, KeyRound, Keyboard,
   Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, Plus, RefreshCw, Save, Search, SunMoon,
   RotateCcw, Trash2, TriangleAlert, UserRound, Zap, ...hostIconSet,
 };
@@ -510,9 +525,18 @@ hostList?.addEventListener("focusout", (event) => {
   const field = event.target as HTMLInputElement;
   if (field.dataset.renameInput) void commitRename(field.dataset.renameInput);
 });
+hostList?.addEventListener("pointerdown", (event) => {
+  const card = (event.target as HTMLElement).closest<HTMLElement>("[data-route-card]");
+  if (card) card.draggable = Boolean((event.target as HTMLElement).closest("[data-drag-handle]"));
+});
+document.addEventListener("pointerup", () => {
+  hostList?.querySelectorAll<HTMLElement>("[data-route-card]").forEach((card) => { card.draggable = false; });
+});
 hostList?.addEventListener("dragstart", (event) => {
   const card = (event.target as HTMLElement).closest<HTMLElement>("[data-route-card]");
-  if (!card?.dataset.routeCard || !event.dataTransfer) return;
+  // Only a card the grip armed reorders. Dragging selected text also raises
+  // this, and that must not quietly move a host.
+  if (!card?.draggable || !card.dataset.routeCard || !event.dataTransfer) return;
   draggedRouteId = card.dataset.routeCard;
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", draggedRouteId);
@@ -536,6 +560,7 @@ hostList?.addEventListener("drop", (event) => {
 });
 hostList?.addEventListener("dragend", () => {
   draggedRouteId = null;
+  hostList.querySelectorAll<HTMLElement>("[data-route-card]").forEach((card) => { card.draggable = false; });
   hostList.querySelectorAll(".is-dragging, .is-drop-target").forEach((item) => item.classList.remove("is-dragging", "is-drop-target"));
 });
 const switchAllClick = (event: Event) => {
@@ -693,6 +718,13 @@ let routeOrder: string[] = [];
 const HOST_NAMES_CHANGED_EVENT = "host-names-changed";
 /** Emitted by the backend when this or a paired host changes an input note. */
 const INPUT_LABELS_CHANGED_EVENT = "input-labels-changed";
+/** How often the window asks every paired host whether it is still up. Each
+ *  check waits out a sleeping host's connect timeout, so this is deliberately
+ *  slow: often enough to notice a host going down, quiet enough to leave the
+ *  network alone. */
+const PRESENCE_REFRESH_INTERVAL_MS = 30_000;
+/** What the last check said about each paired host, keyed by peer id. */
+let hostPresence: Record<string, HostPresence> = {};
 /** Emitted by the backend when a paired host reports the port it occupies. */
 const PEER_INPUTS_CHANGED_EVENT = "peer-inputs-changed";
 /** A paired host declared two display identities to be one display. */
@@ -733,6 +765,8 @@ async function refresh(): Promise<void> {
     // Catch up on host names and order changed while a paired host was offline.
     // Throttled and run in the background by the backend; results arrive as events.
     void invoke("exchange_host_layout").catch((error: unknown) => showToast(t("toast.hostNameFailed"), String(error), true));
+    // Draws with what is already known, then asks the hosts in the background.
+    void loadHostPresence(false).then(() => loadHostPresence(true));
   } catch {
     dashboard = previewDashboard; settings = previewSettings; inputOptionsByMonitor = {}; discoveredPeers = []; isPreview = true;
   } finally {
@@ -826,6 +860,46 @@ async function reloadPeerInputs(): Promise<void> {
   } catch (error) {
     showToast(t("toast.peerInputSyncFailed"), String(error), true);
   }
+}
+
+/** Reads what is known about every paired host, asking them first when
+ *  `check` is set.
+ *
+ *  Never awaited by anything the user is waiting on: a host that is asleep
+ *  answers only once its connect timeout runs out.
+ */
+async function loadHostPresence(check: boolean): Promise<void> {
+  if (isPreview) return;
+  try {
+    const known = await invoke<HostPresence[]>(check ? "refresh_host_presence" : "get_host_presence");
+    hostPresence = Object.fromEntries(known.map((presence) => [presence.peerId, presence]));
+  } catch (error) {
+    // One failed round says nothing about the hosts, so the last answers stay.
+    // It is still worth saying: every host would otherwise sit at "not checked
+    // yet" for the rest of the session with nothing to explain why.
+    if (check) showToast(t("toast.presenceFailed"), String(error), true);
+    return;
+  }
+  renderPresence();
+}
+
+/** Redraws only what a presence answer changes. The host list is left alone
+ *  while a field is being edited there, since a re-render would take the text
+ *  with it. */
+function renderPresence(): void {
+  renderSwitchPanel();
+  if (!isEditingAField()) renderHostList();
+  refreshIcons();
+}
+
+/** Hosts go down without telling anybody, so their standing is only ever as
+ *  fresh as the last check. Checks run only while the window is on screen: a
+ *  window in the tray has nobody to show an answer to. */
+function startPresenceChecks(): void {
+  window.setInterval(() => {
+    if (isPreview || document.visibilityState !== "visible") return;
+    void loadHostPresence(true);
+  }, PRESENCE_REFRESH_INTERVAL_MS);
 }
 
 /** The line under the title: how many displays and hosts, and whether a
@@ -951,6 +1025,135 @@ function canSwitch(shared: SharedMonitorStatus, routeId: string): boolean {
   return routeInputFor(shared, routeId) != null && (shared.ddcAvailable || dashboard.agentConfigured);
 }
 
+type PresenceState = "online" | "offline" | "unknown";
+/** Whether a host can see one shared display, and when it cannot be said, why
+ *  not. Each reason reads differently to somebody about to switch: a host
+ *  nothing has asked yet is nothing to worry about, one that cannot be reached
+ *  is, and "up but this display is not on it" is the one worth acting on. */
+type DisplayAttachment = "sees" | "blind" | "unchecked" | "unreachable" | "unreported";
+
+/** Whether a host answers right now. This computer always does. */
+function presenceState(routeId: string): PresenceState {
+  if (routeId === "local") return "online";
+  const presence = hostPresence[routeId];
+  if (!presence || !presence.checkedAtMs) return "unknown";
+  return presence.online ? "online" : "offline";
+}
+
+function presenceLabel(routeId: string): string {
+  const state = presenceState(routeId);
+  if (state === "online") return t("presence.online");
+  return state === "offline" ? t("presence.offline") : t("presence.unknown");
+}
+
+/** A host's standing in one line: offline since when, or simply online. */
+function presenceSummary(routeId: string): string {
+  if (presenceState(routeId) !== "offline") return presenceLabel(routeId);
+  const presence = hostPresence[routeId];
+  const lastSeen = presence?.lastSeenAtMs
+    ? t("presence.lastSeen", { time: formatClock(presence.lastSeenAtMs) })
+    : t("presence.neverSeen");
+  return `${t("presence.offline")} · ${lastSeen}`;
+}
+
+/** What a standing means, in one short sentence. A row has space for a word,
+ *  and "not checked yet" explains nothing on its own.
+ *
+ *  Deliberately does not repeat what the row already shows — when it was last
+ *  up, or what the last attempt ran into. A tooltip that restates the line it
+ *  hangs off is a wall of text nobody reads twice. */
+function presenceHelp(routeId: string): string {
+  const state = presenceState(routeId);
+  if (state === "online") return t("presence.onlineHelp");
+  return state === "unknown" ? t("presence.unknownHelp") : t("presence.offlineHelp");
+}
+
+/** The reason a host could not be reached, for the line under its row, in the
+ *  words the attempt itself reported. Empty unless it is offline. */
+function presenceProblem(routeId: string): string {
+  if (presenceState(routeId) !== "offline") return "";
+  return hostPresence[routeId]?.detail || t("presence.offlinePlain");
+}
+
+function formatClock(milliseconds: number): string {
+  return new Date(milliseconds).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
+}
+
+function presenceDotHtml(routeId: string): string {
+  const label = escapeHtml(presenceHelp(routeId));
+  return `<span class="presence-dot is-${presenceState(routeId)}" role="img" aria-label="${label}" title="${label}"></span>`;
+}
+
+/** Whether a host can see one shared display. This computer answers from its
+ *  own scan; a paired host answers from what its last reply reported. */
+function attachmentFor(routeId: string, shared: SharedMonitorStatus): DisplayAttachment {
+  if (routeId === "local") {
+    const seen = [...dashboard.monitors, ...(dashboard.uncontrollableMonitors ?? [])]
+      .some((monitor) => sameDisplay(monitor.fingerprint, shared.fingerprint));
+    return seen ? "sees" : "blind";
+  }
+  const state = presenceState(routeId);
+  if (state === "unknown") return "unchecked";
+  if (state === "offline") return "unreachable";
+  const attached = hostPresence[routeId]?.attachedMonitors;
+  if (!attached) return "unreported";
+  return attached.includes(shared.monitorKey) ? "sees" : "blind";
+}
+
+function attachmentLabel(attachment: DisplayAttachment): string {
+  if (attachment === "sees") return t("presence.seesShort");
+  if (attachment === "blind") return t("presence.blindShort");
+  if (attachment === "unreachable") return t("presence.unreachableShort");
+  return attachment === "unreported" ? t("presence.unreportedShort") : t("presence.unknown");
+}
+
+/** What a display's state on one host means, in full.
+ *
+ *  A display drops its link on hosts it is not showing about as often as a
+ *  cable is actually out, so "cannot see it" names both rather than accusing
+ *  the cable; and each way of not knowing says which one it is.
+ */
+function attachmentTitle(routeId: string, name: string, shared: SharedMonitorStatus): string {
+  const attachment = attachmentFor(routeId, shared);
+  if (attachment === "sees") {
+    return routeId === "local" ? t("presence.seesLocal") : t("presence.sees", { name });
+  }
+  if (attachment === "blind") {
+    return routeId === "local" ? t("presence.blindLocal") : t("presence.blind", { name });
+  }
+  if (attachment === "unreachable") return t("presence.attachmentOffline", { name });
+  if (attachment === "unreported") return t("presence.attachmentUnreported", { name });
+  return t("presence.attachmentUnchecked", { name });
+}
+
+/** The short line a host's key carries about one display, or "" when there is
+ *  nothing to say.
+ *
+ *  Only trouble speaks up: a host that is up and sees the display is the
+ *  normal case, and a host nothing has asked yet — every host for the first
+ *  seconds after the window opens — would otherwise cover the key's own label
+ *  with a caveat that resolves itself. The dot carries that state instead.
+ */
+function attachmentNote(routeId: string, shared: SharedMonitorStatus): string {
+  const attachment = attachmentFor(routeId, shared);
+  if (attachment === "unreachable") return t("presence.offline");
+  return attachment === "blind" ? t("presence.blindShort") : "";
+}
+
+/** Whether what a display is set to can still be believed.
+ *
+ *  The active route is a remembered value: it outlives the display being
+ *  unplugged, put to sleep, or switched by its own buttons, and the window
+ *  would go on lighting up a host as "showing" a display that is not there.
+ *  Only evidence against it demotes it — the host it names answered and does
+ *  not see the display, or, for this computer, its own scan cannot find it.
+ *  A paired host showing a display this computer cannot read is the normal
+ *  case and stays confirmed.
+ */
+function activeRouteUnconfirmed(shared: SharedMonitorStatus): boolean {
+  return attachmentFor(activeRouteFor(shared), shared) === "blind";
+}
+
 function displayBadge(shared: SharedMonitorStatus): string {
   if (shared.displayState === "ready") return `<span class="badge is-ok">${t("dashboard.ddcReady")}</span>`;
   if (shared.displayState === "onOtherHost") return `<span class="badge is-muted">${t("dashboard.onOtherHost")}</span>`;
@@ -1016,7 +1219,8 @@ function stagePanelHtml(shared: SharedMonitorStatus, routes: SwitchRoute[]): str
   const activeId = activeRouteFor(shared);
   const active = routes.find((route) => route.id === activeId);
   const activeInput = routeInputFor(shared, activeId);
-  const label = `<span>${t("dashboard.nowShowing")}</span>
+  const unconfirmed = activeRouteUnconfirmed(shared);
+  const label = `<span>${unconfirmed ? t("dashboard.lastShown") : t("dashboard.nowShowing")}</span>
     <strong>${escapeHtml(active?.name ?? routeDisplayName(activeId))}</strong>
     ${activeInput != null ? `<span class="display-port">${escapeHtml(inputName(activeInput, shared.monitorKey))}</span>` : ""}`;
   return `<article class="monitor-panel glass" data-monitor-key="${escapeHtml(shared.monitorKey)}">
@@ -1026,19 +1230,36 @@ function stagePanelHtml(shared: SharedMonitorStatus, routes: SwitchRoute[]): str
       ${displayBadge(shared)}
     </header>
     ${shared.statusText ? `<p class="panel-status">${escapeHtml(shared.statusText)}</p>` : ""}
-    <div class="display-visual" ${active ? `data-color="${active.color}"` : ""}>${displayDrawingHtml(isUltrawide, label, shared.name)}</div>
+    <div class="display-visual" ${active && !unconfirmed ? `data-color="${active.color}"` : ""} ${unconfirmed ? `title="${escapeHtml(unconfirmedTitle(shared))}"` : ""}>${displayDrawingHtml(isUltrawide, label, shared.name)}</div>
     <div class="source-keys glass-flat ${routes.length >= MATRIX_MIN_HOSTS ? "is-stacked" : ""}">
-      ${routes.map((route) => sourceKeyHtml(shared, route, route.id === activeId)).join("")}
+      ${routes.map((route) => sourceKeyHtml(shared, route, route.id === activeId, unconfirmed)).join("")}
     </div>
   </article>`;
 }
 
-/** One host's key under a display: lit when that host is on screen. */
-function sourceKeyHtml(shared: SharedMonitorStatus, route: SwitchRoute, isActive: boolean): string {
+/** Why a display's host cannot be confirmed, for the drawing's tooltip. */
+function unconfirmedTitle(shared: SharedMonitorStatus): string {
+  const activeId = activeRouteFor(shared);
+  const name = routeDisplayName(activeId);
+  return `${t("dashboard.lastShownHint", { name })} ${attachmentTitle(activeId, name, shared)}`;
+}
+
+/** One host's key under a display: lit when that host is on screen, and only
+ *  while that can still be believed. */
+function sourceKeyHtml(shared: SharedMonitorStatus, route: SwitchRoute, isActive: boolean, unconfirmed = false): string {
   const input = routeInputFor(shared, route.id);
   const port = input == null ? t("dashboard.inputUnset") : inputName(input, shared.monitorKey);
-  const copy = `<span class="host-chip"><i data-lucide="${route.icon}"></i></span>
-    <span class="source-copy"><b>${escapeHtml(route.name)}</b><small>${escapeHtml(port)}</small></span>`;
+  const note = attachmentNote(route.id, shared);
+  const noteTitle = escapeHtml(attachmentTitle(route.id, route.name, shared));
+  const copy = `<span class="host-chip"><i data-lucide="${route.icon}"></i>${presenceDotHtml(route.id)}</span>
+    <span class="source-copy"><b>${escapeHtml(route.name)}</b><small>${escapeHtml(port)}</small>${
+      note ? `<small class="source-note" title="${noteTitle}">${escapeHtml(note)}</small>` : ""
+    }</span>`;
+  if (isActive && unconfirmed) {
+    // Named, but not lit: the display cannot be seen to be on this host, and
+    // the filled key is how the window says it is.
+    return `<div class="source-key is-unconfirmed" data-color="${route.color}" aria-current="true" title="${escapeHtml(unconfirmedTitle(shared))}">${copy}<span class="source-action">${t("dashboard.lastShown")}</span></div>`;
+  }
   if (isActive) {
     return `<div class="source-key tint is-active" data-color="${route.color}" aria-current="true">${copy}<span class="source-action">${t("dashboard.currentlyDisplayed")}</span></div>`;
   }
@@ -1052,14 +1273,18 @@ function sourceKeyHtml(shared: SharedMonitorStatus, route: SwitchRoute, isActive
 function matrixHtml(routes: SwitchRoute[]): string {
   const heads = routes.map((route) => {
     const name = escapeHtml(route.name);
-    const isAllShowing = dashboard.shared.every((shared) => activeRouteFor(shared) === route.id);
-    const allButton = isAllShowing
-      ? `<span class="switch-all-host tint is-showing">${t("dashboard.allDisplayed")}</span>`
+    const isAllOnThisHost = dashboard.shared.every((shared) => activeRouteFor(shared) === route.id);
+    const allUnconfirmed = isAllOnThisHost && dashboard.shared.some(activeRouteUnconfirmed);
+    const allButton = isAllOnThisHost
+      ? `<span class="switch-all-host ${allUnconfirmed ? "is-unconfirmed" : "tint is-showing"}">${allUnconfirmed ? t("dashboard.lastShown") : t("dashboard.allDisplayed")}</span>`
       : `<button type="button" class="switch-all-host glass" data-switch-all-id="${escapeHtml(route.id)}" aria-label="${escapeHtml(t("action.switchAllToHost", { name: route.name }))}" ${switchAllTargets(route.id).length ? "" : "disabled"}>${t("switcher.switchAll")}</button>`;
+    const standing = route.local
+      ? t("dashboard.localBadge")
+      : `${platformName(route.platform)} · ${presenceLabel(route.id)}`;
     return `<div class="matrix-host" data-color="${route.color}">
-      <span class="host-chip"><i data-lucide="${route.icon}"></i></span>
+      <span class="host-chip"><i data-lucide="${route.icon}"></i>${presenceDotHtml(route.id)}</span>
       <b title="${name}">${name}</b>
-      <small>${escapeHtml(route.local ? t("dashboard.localBadge") : platformName(route.platform))}</small>
+      <small class="presence-line" title="${escapeHtml(presenceHelp(route.id))}">${escapeHtml(standing)}</small>
       ${allButton}
     </div>`;
   }).join("");
@@ -1067,13 +1292,14 @@ function matrixHtml(routes: SwitchRoute[]): string {
     const { resolution } = resolutionFor(shared);
     const isUltrawide = Boolean(resolution && isUltrawideResolution(resolution));
     const activeId = activeRouteFor(shared);
+    const unconfirmed = activeRouteUnconfirmed(shared);
     const activeColor = routes.find((route) => route.id === activeId)?.color;
     const name = escapeHtml(shared.name);
     return `<div class="matrix-display">
-        <span class="display-thumb ${isUltrawide ? "is-ultrawide" : ""}" ${activeColor ? `data-color="${activeColor}"` : ""}><i></i></span>
+        <span class="display-thumb ${isUltrawide ? "is-ultrawide" : ""}" ${activeColor && !unconfirmed ? `data-color="${activeColor}"` : ""}><i></i></span>
         <div><b title="${name}">${name}</b><small>${escapeHtml(specText(resolution, isUltrawide))}</small></div>
       </div>
-      ${routes.map((route) => matrixCellHtml(shared, route, route.id === activeId)).join("")}`;
+      ${routes.map((route) => matrixCellHtml(shared, route, route.id === activeId, unconfirmed)).join("")}`;
   }).join("");
   return `<section class="matrix-panel glass">
     <div class="matrix">
@@ -1088,16 +1314,25 @@ function matrixHtml(routes: SwitchRoute[]): string {
   </section>`;
 }
 
-function matrixCellHtml(shared: SharedMonitorStatus, route: SwitchRoute, isActive: boolean): string {
+function matrixCellHtml(shared: SharedMonitorStatus, route: SwitchRoute, isActive: boolean, unconfirmed = false): string {
   const input = routeInputFor(shared, route.id);
   const port = input == null ? "" : escapeHtml(inputName(input, shared.monitorKey));
+  if (isActive && unconfirmed) {
+    return `<div class="matrix-cell is-unconfirmed" data-color="${route.color}" aria-current="true" title="${escapeHtml(unconfirmedTitle(shared))}">${port}<small>${t("dashboard.lastShown")}</small></div>`;
+  }
   if (isActive) {
     return `<div class="matrix-cell tint is-active" data-color="${route.color}" aria-current="true">${port}<small>${t("dashboard.currentlyDisplayed")}</small></div>`;
   }
   if (input == null) return `<div class="matrix-cell is-unset">${t("dashboard.inputUnset")}</div>`;
-  const label = escapeHtml(`${shared.name} → ${route.name}`);
-  return `<button type="button" class="matrix-cell" data-color="${route.color}" data-monitor-key="${escapeHtml(shared.monitorKey)}" data-switch-id="${escapeHtml(route.id)}" aria-label="${label}" title="${label}" ${canSwitch(shared, route.id) ? "" : "disabled"}>
-    ${port}<small>${t("action.switchShort")}</small>
+  // The cell is where a display meets a host, so it is where "that host cannot
+  // see this display" belongs. It still switches: a host that is asleep, or a
+  // display that dropped the link, both come back once it is on screen.
+  const note = attachmentNote(route.id, shared);
+  const label = escapeHtml(
+    note ? `${shared.name} → ${route.name} · ${attachmentTitle(route.id, route.name, shared)}` : `${shared.name} → ${route.name}`,
+  );
+  return `<button type="button" class="matrix-cell ${note ? "is-unconfirmed" : ""}" data-color="${route.color}" data-monitor-key="${escapeHtml(shared.monitorKey)}" data-switch-id="${escapeHtml(route.id)}" aria-label="${label}" title="${label}" ${canSwitch(shared, route.id) ? "" : "disabled"}>
+    ${port}<small>${escapeHtml(note || t("action.switchShort"))}</small>
   </button>`;
 }
 
@@ -1537,10 +1772,18 @@ function hostRowHtml(route: SwitchRoute, index: number, total: number): string {
   const title = isRenaming
     ? `<input class="field-input host-name-input" data-rename-input="${id}" value="${escapeHtml(renaming?.draft ?? name)}" placeholder="${escapeHtml(defaultRouteName(route.id))}" maxlength="${MAX_HOST_NAME_CHARS}" aria-label="${escapeHtml(t("dashboard.hostNameLabel"))}" />`
     : `<span class="host-title">${escapeHtml(name)}</span>${route.local ? `<span class="badge">${t("dashboard.localBadge")}</span>` : ""}`;
-  const sub = peer ? `${platformName(peer.platform)} · ${escapeHtml(peer.address)}` : platformName(route.platform);
+  const standing = `<span class="presence-line" title="${escapeHtml(presenceHelp(route.id))}">${presenceDotHtml(route.id)}${escapeHtml(presenceSummary(route.id))}</span>`;
+  const sub = peer
+    ? `${platformName(peer.platform)} · ${escapeHtml(peer.address)} · ${standing}`
+    : platformName(route.platform);
+  // A host that cannot be reached says so in the open: the reason is what
+  // decides whether this is a sleeping host, the wrong network, or a pairing
+  // password that no longer matches.
+  const problem = peer ? presenceProblem(route.id) : "";
+  const canWake = Boolean(peer?.macAddress.trim());
   const peerActions = peer ? `
-    <button class="button small" type="button" data-probe-id="${id}">${t("action.testConnection")}</button>
-    <button class="button small" type="button" data-wake-id="${id}" ${peer.macAddress.trim() ? "" : "disabled"}>${t("action.sendWake")}</button>
+    <button class="button small" type="button" data-probe-id="${id}" title="${escapeHtml(t("action.testConnectionHint", { name }))}">${t("action.testConnection")}</button>
+    <button class="button small" type="button" data-wake-id="${id}" title="${escapeHtml(canWake ? t("action.sendWakeHint", { name }) : t("action.sendWakeUnavailable", { name }))}" ${canWake ? "" : "disabled"}>${t("action.sendWake")}</button>
     <button class="icon-button" type="button" data-remove-peer="${id}" aria-label="${escapeHtml(`${t("action.remove")}: ${name}`)}" title="${t("action.remove")}"><i data-lucide="trash-2"></i></button>` : "";
   const inputs = dashboard.shared.map((shared) => {
     // Each host reports its own port; it is set on that computer, not here.
@@ -1548,14 +1791,24 @@ function hostRowHtml(route: SwitchRoute, index: number, total: number): string {
     const shown = value == null
       ? (peer ? t("settings.peerInputUnreported") : t("dashboard.inputUnset"))
       : inputName(value, shared.monitorKey);
-    return `<div class="sub-row"><span>${escapeHtml(shared.name)}</span><output ${peer ? `title="${escapeHtml(t("settings.peerInputOwnHost"))}"` : ""}>${escapeHtml(shown)}</output></div>`;
+    // A port is what the host is wired to; this is whether the display is
+    // there right now. They answer different questions and both belong here.
+    const attachment = attachmentFor(route.id, shared);
+    const attachmentText = attachmentLabel(attachment);
+    return `<div class="sub-row"><span>${escapeHtml(shared.name)}</span>
+      <span class="sub-values">
+        <output ${peer ? `title="${escapeHtml(t("settings.peerInputOwnHost"))}"` : ""}>${escapeHtml(shown)}</output>
+        <span class="sub-tag is-${attachment}" title="${escapeHtml(attachmentTitle(route.id, route.name, shared))}">${escapeHtml(attachmentText)}</span>
+      </span></div>`;
   }).join("");
-  return `<div class="row has-icon host-row" draggable="${isRenaming ? "false" : "true"}" data-route-card="${id}" title="${escapeHtml(t("dashboard.dragToReorder"))}">
+  return `<div class="row has-icon host-row" data-route-card="${id}">
+      <span class="drag-handle ${isRenaming ? "is-disabled" : ""}" ${isRenaming ? "" : "data-drag-handle"} role="img" aria-label="${escapeHtml(t("action.dragHandle"))}" title="${escapeHtml(t("action.dragHandle"))}"><i data-lucide="grip-vertical"></i></span>
       <button type="button" class="app-icon look-button ${editingLook === route.id ? "is-open" : ""}" data-color="${route.color}" data-edit-look="${id}"
         aria-expanded="${editingLook === route.id}" aria-label="${escapeHtml(t("hostLook.edit", { name }))}" title="${escapeHtml(t("hostLook.edit", { name }))}"><i data-lucide="${route.icon}"></i></button>
       <div>
         <div class="row-title">${title}</div>
         <div class="row-sub">${sub}</div>
+        ${problem ? `<span class="row-hint is-warn">${escapeHtml(problem)}</span>` : ""}
       </div>
       <div class="row-actions" aria-label="${escapeHtml(t("settings.diagnosticAria", { name }))}">
         ${peerActions}
@@ -1798,9 +2051,11 @@ function renderSwitchAllBar(): void {
   }
   const buttons = switchRoutes().map((route) => {
     const name = escapeHtml(route.name);
-    const isAllShowing = dashboard.shared.every((shared) => activeRouteFor(shared) === route.id);
-    if (isAllShowing) {
-      return `<span class="switch-all-host tint is-showing" data-color="${route.color}" title="${escapeHtml(`${route.name} · ${t("dashboard.allDisplayed")}`)}"><span class="swatch"></span>${name}</span>`;
+    const isAllOnThisHost = dashboard.shared.every((shared) => activeRouteFor(shared) === route.id);
+    if (isAllOnThisHost) {
+      const unconfirmed = dashboard.shared.some(activeRouteUnconfirmed);
+      const standing = unconfirmed ? t("dashboard.lastShown") : t("dashboard.allDisplayed");
+      return `<span class="switch-all-host ${unconfirmed ? "is-unconfirmed" : "tint is-showing"}" data-color="${route.color}" title="${escapeHtml(`${route.name} · ${standing}`)}"><span class="swatch"></span>${name}</span>`;
     }
     const label = escapeHtml(t("action.switchAllToHost", { name: route.name }));
     return `<button type="button" class="switch-all-host glass" data-color="${route.color}" data-switch-all-id="${escapeHtml(route.id)}" aria-label="${label}" title="${label}" ${switchAllTargets(route.id).length === 0 ? "disabled" : ""}>
@@ -1975,6 +2230,7 @@ async function addPeer(peerId: string): Promise<void> {
       return shared ? `${shared.name}: ${inputName(assignment.input, shared.monitorKey)}` : String(assignment.input);
     });
     showToast(t("toast.peerAdded"), detectedPorts.length ? t("toast.peerPortDetected", { port: detectedPorts.join(", ") }) : t("toast.peerAddedBody"));
+    void loadHostPresence(true);
   }
   catch (error) { showToast(t("toast.peerAddFailed"), String(error), true); }
 }
@@ -2455,6 +2711,7 @@ async function bootstrap(): Promise<void> {
     window.addEventListener("focus", refreshOnReturn);
     document.addEventListener("visibilitychange", refreshOnReturn);
     startPeriodicRefresh();
+    startPresenceChecks();
   }
   void refreshReleaseHistory();
   if (!settings.onboardingCompleted) showOnboarding(0);

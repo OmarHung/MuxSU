@@ -79,7 +79,7 @@ code, kbd, .mono { font-family: var(--font-mono); }
 /* A filled, host-coloured capsule: the state "this host is on screen".
    Doubled so it outranks the resting background of whatever it is set on. */
 .tint.tint {
-  color: #fff;
+  color: var(--c-ink, #fff);
   background: linear-gradient(180deg, color-mix(in srgb, var(--c) 78%, white), var(--c));
   box-shadow: 0 8px 22px color-mix(in srgb, var(--c) 42%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.55), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
 }

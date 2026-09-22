@@ -411,6 +411,12 @@
           "markdownDescription": "Enables the get_host_order command without any pre-configured scope."
         },
         {
+          "description": "Enables the get_host_presence command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-get-host-presence",
+          "markdownDescription": "Enables the get_host_presence command without any pre-configured scope."
+        },
+        {
           "description": "Enables the get_host_switcher_state command without any pre-configured scope.",
           "type": "string",
           "const": "allow-get-host-switcher-state",
@@ -451,6 +457,12 @@
           "type": "string",
           "const": "allow-probe-peer",
           "markdownDescription": "Enables the probe_peer command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the refresh_host_presence command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-refresh-host-presence",
+          "markdownDescription": "Enables the refresh_host_presence command without any pre-configured scope."
         },
         {
           "description": "Enables the refresh_tray command without any pre-configured scope.",
@@ -627,6 +639,12 @@
           "markdownDescription": "Denies the get_host_order command without any pre-configured scope."
         },
         {
+          "description": "Denies the get_host_presence command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-get-host-presence",
+          "markdownDescription": "Denies the get_host_presence command without any pre-configured scope."
+        },
+        {
           "description": "Denies the get_host_switcher_state command without any pre-configured scope.",
           "type": "string",
           "const": "deny-get-host-switcher-state",
@@ -667,6 +685,12 @@
           "type": "string",
           "const": "deny-probe-peer",
           "markdownDescription": "Denies the probe_peer command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the refresh_host_presence command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-refresh-host-presence",
+          "markdownDescription": "Denies the refresh_host_presence command without any pre-configured scope."
         },
         {
           "description": "Denies the refresh_tray command without any pre-configured scope.",

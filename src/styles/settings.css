@@ -110,6 +110,7 @@
 .row-sub { margin-top: 1px; color: var(--text-2); font-size: 12px; }
 .row-sub.mono { font-size: 11.5px; }
 .row-hint { display: block; margin-top: 3px; color: var(--text-3); font-size: 12px; }
+.row-hint.is-warn { color: var(--warn); }
 .row-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
 .row-warning { margin-top: 4px; color: var(--warn); font-size: 12px; }
 
@@ -124,7 +125,7 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  color: #fff;
+  color: var(--c-ink, #fff);
   background: linear-gradient(180deg, color-mix(in srgb, var(--c, #8e8e93) 75%, white), var(--c, #8e8e93));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
@@ -216,13 +217,34 @@
 
 /* ── Hosts ─────────────────────────────────────────────────────────────── */
 
+/* Grip, icon, name, actions. The grip is the only part that drags, so the
+   name stays selectable and a button press can never turn into a reorder.
+   Needs `.row.has-icon`'s specificity, or its three columns win and the
+   actions wrap onto a row of their own. */
+.row.has-icon.host-row { grid-template-columns: auto auto minmax(0, 1fr) auto; gap: 10px; }
 .host-row { cursor: default; }
-.host-row[draggable="true"] { cursor: grab; }
+.drag-handle {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 34px;
+  margin-left: -8px;
+  border-radius: 8px;
+  color: var(--text-3);
+  cursor: grab;
+  touch-action: none;
+  transition: background var(--fast), color var(--fast);
+}
+.drag-handle:hover { background: var(--glass-weak); color: var(--text-2); }
+.drag-handle .lucide { width: 15px; height: 15px; }
+.drag-handle.is-disabled { opacity: 0.35; cursor: default; }
+.host-row.is-dragging .drag-handle { cursor: grabbing; }
 .host-row.is-dragging { opacity: 0.45; }
 .host-row.is-drop-target { box-shadow: inset 0 2px 0 var(--accent); }
 .host-row .row-title { display: flex; align-items: center; gap: 6px; }
 .host-name-input { width: min(100%, 260px); }
-.sub-rows { position: relative; padding: 2px 16px 10px 62px; }
+.host-row + .host-row::before, .sub-rows + .host-row::before { left: 76px; }
+.sub-rows { position: relative; padding: 2px 16px 10px 76px; }
 .sub-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 30px; font-size: 12.5px; color: var(--text-2); }
 .sub-row output { color: var(--text); font: 600 12px var(--font-mono); }
 .order-buttons { display: flex; gap: 2px; }
@@ -396,3 +418,21 @@
 .look-swatch:hover { transform: scale(1.1); }
 .look-swatch.is-chosen { box-shadow: 0 0 0 2px var(--glass-strong), 0 0 0 4px var(--c); }
 .look-actions { display: flex; justify-content: flex-end; gap: 6px; }
+
+/* A host's port on a display, and whether that display is there right now. */
+.sub-values { display: flex; align-items: center; gap: 8px; }
+.sub-tag {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--glass-weak);
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.sub-tag.is-sees { color: var(--ok); background: color-mix(in srgb, var(--ok) 12%, transparent); }
+.sub-tag.is-blind { color: var(--warn); background: color-mix(in srgb, var(--warn) 12%, transparent); }
+/* Every way of not knowing stays quiet; only an answer is worth a colour. */
+.sub-tag.is-unreachable, .sub-tag.is-unchecked, .sub-tag.is-unreported { cursor: help; }
+.presence-line { cursor: help; white-space: nowrap; }
+.row-sub .presence-dot { position: static; margin-right: 4px; display: inline-block; vertical-align: 1px; border-width: 0; }

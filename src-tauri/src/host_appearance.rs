@@ -15,8 +15,9 @@ pub const ICONS: [&str; 12] = [
     "media", "school",
 ];
 /// Colours a host can wear. The frontend maps each to a light and a dark shade.
-pub const COLORS: [&str; 10] = [
+pub const COLORS: [&str; 12] = [
     "indigo", "teal", "pink", "blue", "orange", "green", "purple", "red", "yellow", "graphite",
+    "black", "silver",
 ];
 /// Most entries sent in or accepted from one notice, like `host_alias`.
 pub const MAX_SHARED_APPEARANCES: usize = 16;

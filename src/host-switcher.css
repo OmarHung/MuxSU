@@ -45,8 +45,23 @@
 .hud-row.is-showing:disabled { opacity: 1; }
 .hud-row:focus { outline: none; }
 
-.host-chip { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
+.host-chip { position: relative; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 10px; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
 .host-chip .lucide { width: 16px; height: 16px; }
+
+/* Whether a host answers, on the chip it wears in every window. */
+.presence-dot {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--glass-strong);
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.presence-dot.is-online { background: var(--ok-glow); }
+.presence-dot.is-unknown { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-3); }
+.hud-row.is-focused .presence-dot { border-color: transparent; }
 .hud-copy { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .hud-copy b { overflow: hidden; font-size: 14px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .hud-copy small { overflow: hidden; color: var(--text-3); font: 500 11.5px var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
@@ -56,8 +71,8 @@
 .hud-row.is-focused.tint {
   box-shadow: 0 4px 12px color-mix(in srgb, var(--c) 30%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
 }
-.hud-row.is-focused .host-chip, .hud-row.is-focused kbd { background: rgba(255, 255, 255, 0.24); color: #fff; box-shadow: none; }
-.hud-row.is-focused .hud-copy small, .hud-row.is-focused .hud-state { color: rgba(255, 255, 255, 0.86); }
+.hud-row.is-focused .host-chip, .hud-row.is-focused kbd { background: color-mix(in srgb, var(--c-ink, #fff) 24%, transparent); color: var(--c-ink, #fff); box-shadow: none; }
+.hud-row.is-focused .hud-copy small, .hud-row.is-focused .hud-state { color: color-mix(in srgb, var(--c-ink, #fff) 86%, transparent); }
 
 .switch-message { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 14px; background: color-mix(in srgb, var(--accent) 12%, transparent); font-size: 12px; }
 .switch-message span { color: var(--text-2); }

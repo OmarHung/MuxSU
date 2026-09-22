@@ -40,6 +40,18 @@ interface HostSwitcherState {
   monitors: HostSwitcherMonitor[];
 }
 
+/** What the backend's last check said about one paired host. */
+interface HostPresence {
+  peerId: string;
+  online: boolean;
+  checkedAtMs: number;
+  lastSeenAtMs: number;
+  /** `monitorKey` of every shared display that host says it can see; null when
+   *  it did not say, which is never the same as "it sees none". */
+  attachedMonitors: string[] | null;
+  detail: string;
+}
+
 interface OperationResult {
   title: string;
   detail: string;
@@ -75,6 +87,8 @@ let target: Target = ALL_DISPLAYS;
 let rows: HostRow[] = [];
 let selectedIndex = 0;
 let switching = false;
+/** What the last check said about each paired host, keyed by peer id. */
+let hostPresence: Record<string, HostPresence> = {};
 /** Counts switch batches. Opening the window again supersedes one still
  *  running, so a stale batch neither carries on nor closes the new window. */
 let batch = 0;
@@ -101,6 +115,46 @@ function platformLabel(platform: Platform): string {
   return platform === "mac" ? "macOS" : "Windows";
 }
 
+type PresenceState = "online" | "offline" | "unknown";
+
+/** Whether a host answers right now. This computer always does. */
+function presenceState(hostId: string): PresenceState {
+  if (hostId === "local") return "online";
+  const presence = hostPresence[hostId];
+  if (!presence || !presence.checkedAtMs) return "unknown";
+  return presence.online ? "online" : "offline";
+}
+
+function presenceLabel(hostId: string): string {
+  const state = presenceState(hostId);
+  if (state === "online") return t("presence.online");
+  return state === "offline" ? t("presence.offline") : t("presence.unknown");
+}
+
+/** What a dot means, as a sentence: the overlay is read at a glance, and a
+ *  word like "not checked yet" explains nothing on its own. */
+function presenceHelp(hostId: string): string {
+  const state = presenceState(hostId);
+  if (state === "online") return t("presence.onlineHelp");
+  if (state === "unknown") return t("presence.unknownHelp");
+  return `${hostPresence[hostId]?.detail || t("presence.offlinePlain")} ${t("presence.offlineHelp")}`;
+}
+
+function presenceDotHtml(hostId: string): string {
+  const label = escapeHtml(presenceHelp(hostId));
+  return `<span class="presence-dot is-${presenceState(hostId)}" role="img" aria-label="${label}" title="${label}"></span>`;
+}
+
+/** Whether a host can see the one display this window is aimed at. Only asked
+ *  for a single display: aimed at all of them, a host is either up or not. */
+function seesTargetedDisplay(hostId: string, monitors: HostSwitcherMonitor[]): boolean | null {
+  const [only] = monitors;
+  if (monitors.length !== 1 || !only || hostId === "local") return null;
+  const presence = hostPresence[hostId];
+  if (!presence?.online || !presence.attachedMonitors) return null;
+  return presence.attachedMonitors.includes(only.monitorKey);
+}
+
 /** The targets Tab cycles through: every display at once, then each one. */
 function targets(): Target[] {
   const keys = state.monitors.map((monitor) => monitor.monitorKey);
@@ -122,9 +176,14 @@ function computeRows(): HostRow[] {
     // backend would only answer that the display is already on that input.
     const switchable = entries.filter(({ option }) => option?.available && !option.isActive).map(({ monitor }) => monitor);
     const single = monitors.length === 1 ? entries[0]?.option : undefined;
-    const detail = single
-      ? `${platformLabel(host.platform)} · ${single.inputName ?? t("switcher.inputUnset")}`
-      : platformLabel(host.platform);
+    const standing = host.isLocal ? "" : presenceLabel(host.id);
+    const blind = seesTargetedDisplay(host.id, monitors) === false ? t("presence.blindShort") : "";
+    const detail = [
+      platformLabel(host.platform),
+      single ? single.inputName ?? t("switcher.inputUnset") : "",
+      standing,
+      blind,
+    ].filter(Boolean).join(" · ");
     const look = hostLook({ icon: host.icon, color: host.color }, host.platform, index);
     return { id: host.id, name: host.name, platform: host.platform, icon: look.lucide, color: look.color, detail, showingCount, switchable };
   });
@@ -167,7 +226,7 @@ function render(message?: { title: string; detail: string; error?: boolean }): v
           return `<button type="button" class="hud-row ${isFocused ? "tint is-focused" : ""} ${isShowing ? "is-showing" : ""}" data-color="${row.color}"
             data-row-index="${index}" role="option" aria-selected="${isFocused}" ${isSelectable(row) && !switching ? "" : "disabled"}>
             <kbd>${index < MAX_NUMBERED_HOSTS ? index + 1 : ""}</kbd>
-            <span class="host-chip"><i data-lucide="${row.icon}"></i></span>
+            <span class="host-chip"><i data-lucide="${row.icon}"></i>${presenceDotHtml(row.id)}</span>
             <span class="hud-copy"><b>${escapeHtml(row.name)}</b><small>${escapeHtml(row.detail)}</small></span>
             <span class="hud-state">${escapeHtml(rowState(row, isFocused))}</span>
           </button>`;
@@ -341,6 +400,7 @@ async function initialize(): Promise<void> {
   target = targets()[0] ?? ALL_DISPLAYS;
   refreshRows();
   render();
+  void loadHostPresence(false).then(() => loadHostPresence(true));
   try {
     await listen(HOST_ORDER_CHANGED_EVENT, () => void reloadState());
     await listen(HOST_NAMES_CHANGED_EVENT, () => void reloadState());
@@ -372,6 +432,23 @@ async function reloadState(): Promise<void> {
   if (await loadState()) render();
 }
 
+/** Reads what is known about the paired hosts, and asks them in the
+ *  background. This window is summoned over whatever the user is doing, so it
+ *  draws with the last answers at once and never waits for new ones. */
+async function loadHostPresence(check: boolean): Promise<void> {
+  try {
+    const known = await invoke<HostPresence[]>(check ? "refresh_host_presence" : "get_host_presence");
+    hostPresence = Object.fromEntries(known.map((presence) => [presence.peerId, presence]));
+  } catch {
+    // Preview mode, or one failed round: keep whatever was known.
+    return;
+  }
+  if (!switching) {
+    refreshRows(rows[selectedIndex]?.id);
+    render();
+  }
+}
+
 /** Fetches the latest hosts into the rows without drawing them; false when
  *  the backend could not answer. */
 async function loadState(): Promise<boolean> {
@@ -382,6 +459,7 @@ async function loadState(): Promise<boolean> {
     // Keep showing the previous hosts; the next time the switcher opens it retries.
     return false;
   }
+  void loadHostPresence(false).then(() => loadHostPresence(true));
   if (!targets().includes(target)) target = targets()[0] ?? ALL_DISPLAYS;
   refreshRows(keep);
   return true;

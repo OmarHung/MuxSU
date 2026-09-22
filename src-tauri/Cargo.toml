@@ -41,5 +41,10 @@ tracing.workspace = true
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+[dev-dependencies]
+# `start_paused` tests run the wait loops on a virtual clock, so a test that
+# covers a 45-second budget still finishes instantly.
+tokio = { workspace = true, features = ["test-util"] }
+
 [target.'cfg(target_os = "windows")'.dependencies]
 windows-sys.workspace = true

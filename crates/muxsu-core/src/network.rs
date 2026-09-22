@@ -730,6 +730,17 @@ pub struct AgentResponse {
     /// empty vec via `#[serde(default)]`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub display_routes: Vec<AgentDisplayRoute>,
+    /// The shared displays the responder can see on its own side right now,
+    /// whether or not DDC/CI reaches them — enough to tell a user that a host
+    /// is up but has no cable to the display they are switching.
+    ///
+    /// `None` is "the responder did not say": an agent that predates this
+    /// field, or one whose own view of its displays is too old to answer for.
+    /// It must read as unknown, never as "nothing attached", so an empty list
+    /// keeps its own meaning: scanned, and none of the shared displays is
+    /// there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attached_monitors: Option<Vec<MonitorFingerprint>>,
     /// The responder's `AGENT_PROTOCOL_VERSION`. It is covered by the response
     /// signature and must match before any response data is accepted.
     #[serde(default)]

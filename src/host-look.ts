@@ -38,6 +38,8 @@ export const HOST_COLORS = [
   { key: "red", label: "hostLook.color.red" },
   { key: "yellow", label: "hostLook.color.yellow" },
   { key: "graphite", label: "hostLook.color.graphite" },
+  { key: "black", label: "hostLook.color.black" },
+  { key: "silver", label: "hostLook.color.silver" },
 ] as const satisfies readonly { key: string; label: MessageKey }[];
 
 /** Colours hosts wear by default, by their place in the host order. Paired
