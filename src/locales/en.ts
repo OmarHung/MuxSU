@@ -213,7 +213,7 @@ const en = {
   "settings.inputsUnknown": "This display\u2019s inputs have not been read yet",
   "settings.localInputAria": "Input this computer uses on {monitor}",
   "settings.experimentalTitle": "Experimental: ",
-  "settings.experimentalBody": "Re-seat signal has been verified on one display and one pair of hosts (an MSI MPG 274U, Mac to Windows). It sends the picture to another host and asks that host to switch it back, and moves nothing when that host does not answer; if it cannot be brought back, the display\u2019s own buttons or MuxSU on the other computer will do it. Re-detect only reads, and is not experimental.",
+  "settings.experimentalBody": "Re-seat signal sends the picture to another host and asks that host to switch it back. It moves nothing when that host does not answer; if it cannot be brought back, the display\u2019s own buttons or MuxSU on the other computer will do it. Re-detect only reads, and is not experimental.",
   "settings.experimentalTag": "(Experimental)",
   "settingsTab.experimental": "Experimental",
   "settingsTab.experimentalBody": "Features that have not been verified on enough displays yet. They appear on the Displays tab once you turn them on.",

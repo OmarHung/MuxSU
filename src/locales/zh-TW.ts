@@ -97,7 +97,7 @@ const zhTW: Record<keyof typeof en, string> = {
   "settings.inputsUnknown": "尚未讀取到這台螢幕的輸入",
   "settings.localInputAria": "{monitor} 這台電腦使用的輸入",
   "settings.experimentalTitle": "實驗性功能：",
-  "settings.experimentalBody": "「重送訊號」只在一組螢幕與主機上驗證過（MSI MPG 274U，Mac ↔ Windows）。它會把畫面送到另一台主機再請對方切回來，對方沒有回應時就不會動螢幕；萬一切不回來，可以用螢幕上的按鍵，或在另一台電腦上切回來。「重新偵測」只做讀取，不在此列。",
+  "settings.experimentalBody": "「重送訊號」會把畫面送到另一台主機，再請對方切回來。對方沒有回應時就不會動螢幕；萬一切不回來，可以用螢幕上的按鍵，或在另一台電腦上切回來。「重新偵測」只做讀取，不在此列。",
   "settings.experimentalTag": "（實驗性）",
   "settingsTab.experimental": "實驗性功能",
   "settingsTab.experimentalBody": "還沒在足夠多的螢幕上驗證過的功能。開啟後才會出現在螢幕分頁裡。",
