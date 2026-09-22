@@ -2,7 +2,7 @@ import { t, type MessageKey } from "./i18n";
 import { diagnosticsDialogsHtml, diagnosticsSectionHtml } from "./diagnostics";
 
 /** The settings sections, in tab-list order. */
-export const SETTINGS_TABS = ["displays", "hosts", "startup", "appearance", "help", "reset"] as const;
+export const SETTINGS_TABS = ["displays", "hosts", "startup", "appearance", "experimental", "help", "reset"] as const;
 export type SettingsTab = typeof SETTINGS_TABS[number];
 
 interface TabSpec { id: SettingsTab; icon: string; label: MessageKey; countId?: string; danger?: boolean }
@@ -14,6 +14,7 @@ const upperTabs: TabSpec[] = [
   { id: "appearance", icon: "sun-moon", label: "settingsTab.appearance" },
 ];
 const lowerTabs: TabSpec[] = [
+  { id: "experimental", icon: "flask-conical", label: "settingsTab.experimental" },
   { id: "help", icon: "circle-help", label: "settingsTab.help" },
   { id: "reset", icon: "triangle-alert", label: "settingsTab.reset", danger: true },
 ];
@@ -57,7 +58,7 @@ function displaysTab(): string {
       <h3 class="group-title">${t("settings.maintenance")}</h3>
       <p class="section-hint">${t("settings.maintenanceHint")}</p>
       <div class="list" id="display-maintenance"></div>
-      <div class="note glass"><i data-lucide="flask-conical"></i><p><b>${t("settings.experimentalTitle")}</b>${t("settings.experimentalBody")}</p></div>
+      <div class="note glass" id="maintenance-experimental-note" hidden><i data-lucide="flask-conical"></i><p><b>${t("settings.experimentalTitle")}</b>${t("settings.experimentalBody")}</p></div>
     </div>
     <div class="note glass"><i data-lucide="info"></i><p><b>${t("settings.detectionTitle")}</b>${t("settings.detectionBody")}</p></div>
   </section>`;
@@ -146,6 +147,18 @@ function appearanceTab(): string {
 
 function noteCard(title: MessageKey, body: MessageKey): string {
   return `<article class="note-card glass"><h4>${t(title)}</h4><p>${t(body)}</p></article>`;
+}
+
+function experimentalTab(): string {
+  return `<section class="settings-tab" id="settings-tab-experimental" data-settings-panel="experimental">
+    ${tabHead("settingsTab.experimental", "settingsTab.experimentalBody")}
+    <div class="form-section first">
+      <div class="list">
+        ${switchRow("experimental-enabled", "settings.experimentalSwitch", "settings.experimentalSwitchHint")}
+      </div>
+    </div>
+    <div class="note glass"><i data-lucide="flask-conical"></i><p><b>${t("settings.experimentalTitle")}</b>${t("settings.experimentalBody")}</p></div>
+  </section>`;
 }
 
 function helpTab(releaseRows: string): string {
@@ -287,6 +300,7 @@ export function appShellHtml(options: { releaseRows: string; minSharedKeyLength:
             ${hostsTab(options.minSharedKeyLength)}
             ${startupTab()}
             ${appearanceTab()}
+            ${experimentalTab()}
             ${helpTab(options.releaseRows)}
             ${resetTab()}
             <div class="form-actions glass" id="form-actions" hidden>

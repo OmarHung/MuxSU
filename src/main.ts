@@ -10,6 +10,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import packageMetadata from "../package.json";
 import { locale, localePreference, setLocalePreference, t, type MessageKey } from "./i18n";
 import { initDiagnostics } from "./diagnostics";
+import { experimentalEnabled, setExperimentalEnabled } from "./experimental";
 import { HOST_COLORS, HOST_ICONS, hostIconSet, hostLook, type CustomLook } from "./host-look";
 import { appShellHtml, SETTINGS_TABS, type SettingsTab } from "./layout";
 import { initializeTheme, setThemePreference } from "./theme";
@@ -415,6 +416,11 @@ document.querySelector("#monitor-picker")?.addEventListener("click", (event) => 
   const selected = button.dataset.monitorSelected === "true";
   void withBusyDisplay(busyKey, () => (selected ? removeSharedMonitor(monitorId) : addSharedMonitor(monitorId)));
 });
+document.querySelector<HTMLInputElement>("#experimental-enabled")?.addEventListener("change", (event) => {
+  showExperimental = setExperimentalEnabled((event.target as HTMLInputElement).checked);
+  renderDisplayMaintenance();
+  refreshIcons();
+});
 document.querySelector("#display-maintenance")?.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-maintain]");
   const monitorKey = button?.dataset.monitorKey;
@@ -751,6 +757,8 @@ let editingLook: string | null = null;
 const HOST_APPEARANCES_CHANGED_EVENT = "host-appearances-changed";
 /** The host card whose name is being edited, and the unsaved text. */
 let renaming: { routeId: string; draft: string } | null = null;
+/** Whether this window offers the display actions that are still unproven. */
+let showExperimental = experimentalEnabled();
 let isRefreshing = false;
 let lastRefreshAt = 0;
 let inputNamesReloadPending = false;
@@ -815,6 +823,8 @@ function discardUnsavedChanges(): void {
   if (checkUpdates) checkUpdates.checked = settings.checkUpdates;
   const hostSwitcherEnabled = document.querySelector<HTMLInputElement>("#host-switcher-enabled");
   if (hostSwitcherEnabled) hostSwitcherEnabled.checked = settings.hostSwitcherEnabled;
+  const experimentalSwitch = document.querySelector<HTMLInputElement>("#experimental-enabled");
+  if (experimentalSwitch) experimentalSwitch.checked = showExperimental;
   renderShortcutSetting();
   setUnsavedVisible(false);
 }
@@ -1681,17 +1691,22 @@ function renderDisplayMaintenance(): void {
     // A display whose USB rides the same cable has a hub or KVM of its own,
     // and that binding follows the active input rather than the panel: an
     // MSI MPG 274U came back from a power cycle with its USB still detached.
-    const usbNote = shared.connection?.sharesUsbData
+    const usbNote = shared.connection?.sharesUsbData && showExperimental
       ? `<span class="row-hint is-warn">${escapeHtml(t("settings.powerCycleUsbNote"))}</span>` : "";
+    // The two that write to the display stay out of sight until the user has
+    // turned them on: one of them can leave the picture on another computer.
+    const writing = !showExperimental ? "" : `
+        <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(experimental(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable")))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>
+        <button type="button" class="button small" data-maintain="power" data-monitor-key="${key}" title="${escapeHtml(experimental(t("settings.powerCycleHint")))}"><i data-lucide="power"></i>${t("action.powerCycle")}</button>`;
     return `<div class="row">
       <div><div class="row-title">${escapeHtml(shared.name)}</div><span class="row-hint">${escapeHtml(shared.statusText)}</span>${usbNote}</div>
       <div class="row-actions">
-        <button type="button" class="button small" data-maintain="redetect" data-monitor-key="${key}" title="${escapeHtml(t("settings.redetectHint"))}"><i data-lucide="search"></i>${t("action.redetectDisplay")}</button>
-        <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(experimental(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable")))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>
-        <button type="button" class="button small" data-maintain="power" data-monitor-key="${key}" title="${escapeHtml(experimental(t("settings.powerCycleHint")))}"><i data-lucide="power"></i>${t("action.powerCycle")}</button>
+        <button type="button" class="button small" data-maintain="redetect" data-monitor-key="${key}" title="${escapeHtml(t("settings.redetectHint"))}"><i data-lucide="search"></i>${t("action.redetectDisplay")}</button>${writing}
       </div>
     </div>`;
   }).join("");
+  const note = document.querySelector<HTMLElement>("#maintenance-experimental-note");
+  if (note) note.hidden = !showExperimental;
 }
 
 /** Hosts whose saved input for `shared` is `value`, by route id. */
