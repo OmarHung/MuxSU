@@ -1,5 +1,5 @@
 import {
-  Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, createIcons, Download, ExternalLink, Github, Info,
+  Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, createIcons, Download, ExternalLink, FlaskConical, Github, Info,
   GripVertical, KeyRound, Keyboard, Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap,
   Plus, Power, RefreshCw, RotateCcw, Save, Search, SunMoon, Trash2, TriangleAlert, UserRound, Zap,
 } from "lucide";
@@ -307,7 +307,7 @@ const themePreference = initializeTheme();
 app.innerHTML = appShellHtml({ releaseRows: releaseHistoryRows(releaseHistoryFallback), minSharedKeyLength: MIN_SHARED_KEY_LENGTH });
 
 const iconSet = {
-  Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, Github, GripVertical, Info, KeyRound, Keyboard,
+  Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FlaskConical, Github, GripVertical, Info, KeyRound, Keyboard,
   Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap, Plus, Power, RefreshCw, Save, Search,
   SunMoon, RotateCcw, Trash2, TriangleAlert, UserRound, Zap, ...hostIconSet,
 };
@@ -1649,6 +1649,9 @@ function renderLocalInputSummary(): void {
   }).join("");
 }
 
+/** Marks the two actions that write to a display nobody has verified this on. */
+const experimental = (hint: string) => `${t("settings.experimentalTag")} ${hint}`;
+
 /**
  * The recoveries for one shared display, one button each.
  *
@@ -1684,8 +1687,8 @@ function renderDisplayMaintenance(): void {
       <div><div class="row-title">${escapeHtml(shared.name)}</div><span class="row-hint">${escapeHtml(shared.statusText)}</span>${usbNote}</div>
       <div class="row-actions">
         <button type="button" class="button small" data-maintain="redetect" data-monitor-key="${key}" title="${escapeHtml(t("settings.redetectHint"))}"><i data-lucide="search"></i>${t("action.redetectDisplay")}</button>
-        <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable"))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>
-        <button type="button" class="button small" data-maintain="power" data-monitor-key="${key}" title="${escapeHtml(t("settings.powerCycleHint"))}"><i data-lucide="power"></i>${t("action.powerCycle")}</button>
+        <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(experimental(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable")))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>
+        <button type="button" class="button small" data-maintain="power" data-monitor-key="${key}" title="${escapeHtml(experimental(t("settings.powerCycleHint")))}"><i data-lucide="power"></i>${t("action.powerCycle")}</button>
       </div>
     </div>`;
   }).join("");

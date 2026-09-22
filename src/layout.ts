@@ -57,6 +57,7 @@ function displaysTab(): string {
       <h3 class="group-title">${t("settings.maintenance")}</h3>
       <p class="section-hint">${t("settings.maintenanceHint")}</p>
       <div class="list" id="display-maintenance"></div>
+      <div class="note glass"><i data-lucide="flask-conical"></i><p><b>${t("settings.experimentalTitle")}</b>${t("settings.experimentalBody")}</p></div>
     </div>
     <div class="note glass"><i data-lucide="info"></i><p><b>${t("settings.detectionTitle")}</b>${t("settings.detectionBody")}</p></div>
   </section>`;
