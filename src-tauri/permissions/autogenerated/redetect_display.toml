@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-redetect-display"
+description = "Enables the redetect_display command without any pre-configured scope."
+commands.allow = ["redetect_display"]
+
+[[permission]]
+identifier = "deny-redetect-display"
+description = "Denies the redetect_display command without any pre-configured scope."
+commands.deny = ["redetect_display"]

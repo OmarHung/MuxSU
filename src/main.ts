@@ -1,7 +1,7 @@
 import {
   Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, createIcons, Download, ExternalLink, Github, Info,
-  GripVertical, KeyRound, Keyboard, Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, Plus,
-  RefreshCw, RotateCcw, Save, Search, SunMoon, Trash2, TriangleAlert, UserRound, Zap,
+  GripVertical, KeyRound, Keyboard, Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap,
+  Plus, Power, RefreshCw, RotateCcw, Save, Search, SunMoon, Trash2, TriangleAlert, UserRound, Zap,
 } from "lucide";
 import { getVersion } from "@tauri-apps/api/app";
 import { Channel, invoke } from "@tauri-apps/api/core";
@@ -308,8 +308,8 @@ app.innerHTML = appShellHtml({ releaseRows: releaseHistoryRows(releaseHistoryFal
 
 const iconSet = {
   Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, Github, GripVertical, Info, KeyRound, Keyboard,
-  Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, Plus, RefreshCw, Save, Search, SunMoon,
-  RotateCcw, Trash2, TriangleAlert, UserRound, Zap, ...hostIconSet,
+  Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap, Plus, Power, RefreshCw, Save, Search,
+  SunMoon, RotateCcw, Trash2, TriangleAlert, UserRound, Zap, ...hostIconSet,
 };
 const refreshIcons = () => createIcons({ icons: iconSet });
 refreshIcons();
@@ -414,6 +414,12 @@ document.querySelector("#monitor-picker")?.addEventListener("click", (event) => 
   if (!button || !monitorId || !busyKey) return;
   const selected = button.dataset.monitorSelected === "true";
   void withBusyDisplay(busyKey, () => (selected ? removeSharedMonitor(monitorId) : addSharedMonitor(monitorId)));
+});
+document.querySelector("#display-maintenance")?.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-maintain]");
+  const monitorKey = button?.dataset.monitorKey;
+  if (!button || !monitorKey) return;
+  void withBusyButton(button, () => maintainDisplay(button.dataset.maintain ?? "", monitorKey));
 });
 document.querySelector("#local-input-summary")?.addEventListener("change", (event) => {
   const field = (event.target as HTMLElement).closest<HTMLSelectElement>("[data-local-input]");
@@ -1364,7 +1370,7 @@ function renderState(): void {
   renderShortcutSetting();
   renderSwitchPanel();
   diagnostics.render();
-  renderMonitors(); renderMonitorMerge(); renderPeerList(); renderHostList(); renderLocalInputSummary(); renderInputLabels(); refreshIcons();
+  renderMonitors(); renderMonitorMerge(); renderPeerList(); renderHostList(); renderLocalInputSummary(); renderInputLabels(); renderDisplayMaintenance(); refreshIcons();
   // The tray menu lists the same displays and hosts. Nothing here can do
   // anything about a menu that failed to rebuild; the backend logs it.
   if (!isPreview) void invoke("refresh_tray").catch(() => undefined);
@@ -1643,6 +1649,48 @@ function renderLocalInputSummary(): void {
   }).join("");
 }
 
+/**
+ * The recoveries for one shared display, one button each.
+ *
+ * They are separate buttons because they cost the user different things: a
+ * re-detection only reads, a power cycle blanks the panel for a moment, and
+ * re-seating the signal sends the display out through another input and back.
+ */
+function renderDisplayMaintenance(): void {
+  const container = document.querySelector("#display-maintenance");
+  if (!container) return;
+  if (!dashboard.shared.length) {
+    container.innerHTML = `<p class="empty-note">${t("settings.noMonitors")}</p>`;
+    return;
+  }
+  container.innerHTML = dashboard.shared.map((shared) => {
+    // Re-seating takes two hosts. This computer can send the display away —
+    // it is the one on screen — but it cannot bring it back, because a display
+    // answers DDC/CI only on the input it is showing. So it needs a paired
+    // host that has a port on this display and is not known to be offline;
+    // the backend confirms that host answers before anything moves.
+    const partner = settings.peers.find((peer) =>
+      peer.inputs.some((assignment) => sameDisplay(assignment.monitor, shared.fingerprint)
+        && assignment.input !== selectedMonitorFor(shared)?.localInput));
+    const canResync = selectedMonitorFor(shared)?.localInput != null
+      && partner != null && presenceState(partner.id) !== "offline";
+    const key = escapeHtml(shared.monitorKey);
+    // A display whose USB rides the same cable has a hub or KVM of its own,
+    // and that binding follows the active input rather than the panel: an
+    // MSI MPG 274U came back from a power cycle with its USB still detached.
+    const usbNote = shared.connection?.sharesUsbData
+      ? `<span class="row-hint is-warn">${escapeHtml(t("settings.powerCycleUsbNote"))}</span>` : "";
+    return `<div class="row">
+      <div><div class="row-title">${escapeHtml(shared.name)}</div><span class="row-hint">${escapeHtml(shared.statusText)}</span>${usbNote}</div>
+      <div class="row-actions">
+        <button type="button" class="button small" data-maintain="redetect" data-monitor-key="${key}" title="${escapeHtml(t("settings.redetectHint"))}"><i data-lucide="search"></i>${t("action.redetectDisplay")}</button>
+        <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable"))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>
+        <button type="button" class="button small" data-maintain="power" data-monitor-key="${key}" title="${escapeHtml(t("settings.powerCycleHint"))}"><i data-lucide="power"></i>${t("action.powerCycle")}</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
 /** Hosts whose saved input for `shared` is `value`, by route id. */
 function inputUserRoutes(shared: SharedMonitorStatus, value: number): string[] {
   const localUser = selectedMonitorFor(shared)?.localInput === value ? ["local"] : [];
@@ -1699,6 +1747,7 @@ function renderInputNames(): void {
   renderLocalInputSummary();
   renderHostList();
   renderInputLabels();
+  renderDisplayMaintenance();
   renderSwitchPanel();
   refreshIcons();
 }
@@ -2162,6 +2211,26 @@ async function mergeSharedMonitor(aliasId: string, primaryId: string): Promise<v
 /** Saves which input this computer occupies on a shared display. Announced to
  *  paired hosts like a detected one, so a correction here corrects where every
  *  other computer switches to. */
+const MAINTENANCE_COMMANDS: Record<string, string> = {
+  redetect: "redetect_display",
+  resync: "resync_display_input",
+  power: "power_cycle_display",
+};
+
+async function maintainDisplay(action: string, monitorKey: string): Promise<void> {
+  const command = MAINTENANCE_COMMANDS[action];
+  if (!command) return;
+  try {
+    const result = await invoke<OperationResult>(command, { monitorId: monitorKey });
+    showToast(result.title, result.detail, result.warning);
+    // A re-detection replaces the input list every other field here is drawn
+    // from, and may have confirmed this computer's own input along the way.
+    if (action === "redetect") await refresh();
+  } catch (error) {
+    showToast(t("toast.maintenanceFailed"), String(error), true);
+  }
+}
+
 async function commitLocalInput(monitorKey: string, value: string): Promise<void> {
   const input = value === "" ? null : Number(value);
   try {

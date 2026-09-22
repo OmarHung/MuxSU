@@ -6,6 +6,7 @@ mod domain;
 #[cfg_attr(target_os = "windows", allow(dead_code))]
 mod edid;
 mod error;
+mod maintenance;
 mod network;
 mod port;
 mod service;
@@ -24,9 +25,11 @@ pub use connection::{
 };
 pub use domain::{
     DestinationHost, DiscoveredPeer, DisplayInput, DisplayMuxProfile, MonitorDescriptor,
-    MonitorFingerprint, MonitorId, MonitorResolution, ResolutionSource, SwitchMode, SwitchOutcome,
+    MonitorFingerprint, MonitorId, MonitorResolution, PowerState, ResolutionSource, SwitchMode,
+    SwitchOutcome,
 };
 pub use error::DisplayMuxError;
+pub use maintenance::{power_cycle, MaintenanceError};
 pub use network::{
     derive_pairing_key, is_local_network_address, AgentAction, AgentClient, AgentDisplayRoute,
     AgentHostInput, AgentRequest, AgentResponse, AgentServer, HostAlias, HostAppearance,

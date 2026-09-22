@@ -98,7 +98,7 @@ impl DisplayMuxError {
 }
 
 fn english_detail(detail: &str) -> String {
-    const PREFIXES: [(&str, &str); 13] = [
+    const PREFIXES: [(&str, &str); 14] = [
         ("回應格式無效：", "Invalid response format: "),
         (
             "macOS 無法透過目前的 HDMI／USB-C／Thunderbolt 路徑使用 DDC/CI：",
@@ -111,6 +111,10 @@ fn english_detail(detail: &str) -> String {
         (
             "無法切換共用螢幕輸入來源：",
             "Unable to switch the shared display input: ",
+        ),
+        (
+            "無法變更共用螢幕電源狀態：",
+            "Unable to change the shared display's power state: ",
         ),
         (
             "無法連線 Windows WMI 螢幕資料：",

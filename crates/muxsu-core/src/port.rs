@@ -1,4 +1,6 @@
-use crate::{DiscoveredPeer, DisplayInput, DisplayMuxError, MonitorDescriptor, MonitorId};
+use crate::{
+    DiscoveredPeer, DisplayInput, DisplayMuxError, MonitorDescriptor, MonitorId, PowerState,
+};
 
 pub trait MonitorControl {
     fn enumerate(&self) -> Result<Vec<MonitorDescriptor>, DisplayMuxError>;
@@ -16,6 +18,20 @@ pub trait MonitorControl {
     }
 
     fn write_input(&self, monitor: &MonitorId, input: DisplayInput) -> Result<(), DisplayMuxError>;
+
+    /// Writes the display's own power state (VCP 0xD6), leaving every input
+    /// selection as it is.
+    ///
+    /// The default refuses rather than reports success: a controller with no
+    /// power channel must not let a caller believe it darkened a panel it
+    /// never touched.
+    fn write_power_state(
+        &self,
+        _monitor: &MonitorId,
+        _state: PowerState,
+    ) -> Result<(), DisplayMuxError> {
+        Err(DisplayMuxError::UnsupportedPlatform)
+    }
 }
 
 pub trait PeerDiscovery {

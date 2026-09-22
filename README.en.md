@@ -52,6 +52,14 @@ You can share more than one monitor; each host stores its own input port for eac
 - A global shortcut can summon a small host picker even while the main window is hidden: number keys pick a host, Tab changes the target display.
 - The tray (the menu bar on macOS) switches too: every display to one host, or each display on its own.
 
+**Display maintenance**
+
+- When the picture does not come back, settings can restart a shared display on the spot: DDC/CI turns it off and back on, changing no input selection.
+- It can also send the display out through a paired host's input and back, so it re-establishes the link to this computer. Once the display leaves, only the host it is then showing can switch it back, so that host is asked first — and nothing moves if it does not answer.
+- Re-detection reads which inputs the display accepts, and which one it is showing, from the display again. What is stored is kept when nothing can be read.
+- Whether these work is up to the display's firmware, and some displays refuse them. A failure says where the display stopped and how to bring it back.
+- A display's built-in USB hub or KVM follows the active input, not the panel's power: a restart does not always bring it back (observed on an MSI MPG 274U). Re-seat the signal when it does not.
+
 **Also**
 
 - Each host can wear an icon and a colour (12 icons, 10 colours), which the switch centre, the switcher and settings use to tell hosts apart.

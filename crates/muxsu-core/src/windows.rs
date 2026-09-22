@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ffi::c_void, mem::size_of, ptr};
+use std::{collections::HashMap, ffi::c_void, mem::size_of, ptr, thread, time::Duration};
 
 use serde::Deserialize;
 use windows_sys::core::BOOL;
@@ -20,11 +20,41 @@ use wmi::WMIConnection;
 
 use crate::{
     capabilities, windows_connection, DisplayInput, DisplayMuxError, MonitorControl,
-    MonitorDescriptor, MonitorFingerprint, MonitorId, MonitorResolution, ResolutionSource,
+    MonitorDescriptor, MonitorFingerprint, MonitorId, MonitorResolution, PowerState,
+    ResolutionSource,
 };
 
 const INPUT_SOURCE_VCP_CODE: u8 = 0x60;
+const POWER_MODE_VCP_CODE: u8 = 0xd6;
 const MAX_CAPABILITIES_LENGTH: u32 = 64 * 1024;
+
+/// Windows reports transient DDC/CI faults on a bus that is otherwise
+/// healthy — most often `ERROR_GRAPHICS_DDCCI_INVALID_MESSAGE_COMMAND`
+/// (`0xC0262585`), observed on an MSI MPG 274U in the seconds after an input
+/// change, while the display is still re-syncing and answering badly. A short
+/// retry with a freshly opened physical-monitor handle clears them; this is
+/// the same mitigation the macOS path and ddcutil already use, and without it
+/// one bad reply fails a switch a paired host is relying on.
+const DDC_RETRY_ATTEMPTS: u32 = 3;
+const DDC_RETRY_DELAY: Duration = Duration::from_millis(120);
+
+fn with_ddc_retry<T>(
+    mut operation: impl FnMut() -> Result<T, DisplayMuxError>,
+) -> Result<T, DisplayMuxError> {
+    let mut last_error = None;
+    for attempt in 0..DDC_RETRY_ATTEMPTS {
+        match operation() {
+            Ok(value) => return Ok(value),
+            Err(error) => {
+                if attempt + 1 < DDC_RETRY_ATTEMPTS {
+                    thread::sleep(DDC_RETRY_DELAY);
+                }
+                last_error = Some(error);
+            }
+        }
+    }
+    Err(last_error.expect("loop runs at least DDC_RETRY_ATTEMPTS >= 1 time"))
+}
 
 pub struct WindowsMonitorController;
 
@@ -101,50 +131,32 @@ impl WindowsMonitorController {
 
     /// Returns the display's `(current, maximum)` reply for VCP 0x60.
     fn read_input_reply(&self, monitor: &MonitorId) -> Result<(u32, u32), DisplayMuxError> {
-        let native = self.find_native(monitor)?;
-        let mut code_type = 0;
-        let mut current = 0;
-        let mut maximum = 0;
+        with_ddc_retry(|| {
+            let native = self.find_native(monitor)?;
+            let mut code_type = 0;
+            let mut current = 0;
+            let mut maximum = 0;
 
-        // SAFETY: `native.handle` is an owned, live physical-monitor handle. All out-pointers
-        // reference initialized local `u32` values for the duration of the call.
-        let succeeded = unsafe {
-            GetVCPFeatureAndVCPFeatureReply(
-                native.handle,
-                INPUT_SOURCE_VCP_CODE,
-                &mut code_type,
-                &mut current,
-                &mut maximum,
-            )
-        };
-        if succeeded == 0 {
-            return Err(last_windows_error("無法讀取共用螢幕目前的輸入來源"));
-        }
+            // SAFETY: `native.handle` is an owned, live physical-monitor handle. All out-pointers
+            // reference initialized local `u32` values for the duration of the call.
+            let succeeded = unsafe {
+                GetVCPFeatureAndVCPFeatureReply(
+                    native.handle,
+                    INPUT_SOURCE_VCP_CODE,
+                    &mut code_type,
+                    &mut current,
+                    &mut maximum,
+                )
+            };
+            if succeeded == 0 {
+                return Err(last_windows_error("無法讀取共用螢幕目前的輸入來源"));
+            }
 
-        Ok((current, maximum))
-    }
-}
-
-impl MonitorControl for WindowsMonitorController {
-    fn enumerate(&self) -> Result<Vec<MonitorDescriptor>, DisplayMuxError> {
-        Ok(self
-            .enumerate_native()?
-            .into_iter()
-            .map(|monitor| monitor.descriptor.clone())
-            .collect())
+            Ok((current, maximum))
+        })
     }
 
-    fn read_input(&self, monitor: &MonitorId) -> Result<DisplayInput, DisplayMuxError> {
-        let (current, _) = self.read_input_reply(monitor)?;
-        DisplayInput::new(current)
-    }
-
-    fn input_value_maximum(&self, monitor: &MonitorId) -> Result<Option<u32>, DisplayMuxError> {
-        let (_, maximum) = self.read_input_reply(monitor)?;
-        Ok(Some(maximum))
-    }
-
-    fn supported_inputs(&self, monitor: &MonitorId) -> Result<Vec<DisplayInput>, DisplayMuxError> {
+    fn read_capabilities(&self, monitor: &MonitorId) -> Result<Vec<DisplayInput>, DisplayMuxError> {
         let native = self.find_native(monitor)?;
         let mut length = 0_u32;
         // SAFETY: the physical-monitor handle is live and `length` is a valid out-pointer.
@@ -173,19 +185,70 @@ impl MonitorControl for WindowsMonitorController {
         }
         Ok(inputs)
     }
+}
+
+impl MonitorControl for WindowsMonitorController {
+    fn enumerate(&self) -> Result<Vec<MonitorDescriptor>, DisplayMuxError> {
+        Ok(self
+            .enumerate_native()?
+            .into_iter()
+            .map(|monitor| monitor.descriptor.clone())
+            .collect())
+    }
+
+    fn read_input(&self, monitor: &MonitorId) -> Result<DisplayInput, DisplayMuxError> {
+        let (current, _) = self.read_input_reply(monitor)?;
+        DisplayInput::new(current)
+    }
+
+    fn input_value_maximum(&self, monitor: &MonitorId) -> Result<Option<u32>, DisplayMuxError> {
+        let (_, maximum) = self.read_input_reply(monitor)?;
+        Ok(Some(maximum))
+    }
+
+    fn supported_inputs(&self, monitor: &MonitorId) -> Result<Vec<DisplayInput>, DisplayMuxError> {
+        with_ddc_retry(|| self.read_capabilities(monitor))
+    }
 
     fn write_input(&self, monitor: &MonitorId, input: DisplayInput) -> Result<(), DisplayMuxError> {
-        let native = self.find_native(monitor)?;
+        with_ddc_retry(|| {
+            let native = self.find_native(monitor)?;
 
-        // SAFETY: `native.handle` is an owned, live physical-monitor handle, VCP 0x60 is the
-        // MCCS input-source feature, and `DisplayInput` restricts values to one byte.
-        let succeeded =
-            unsafe { SetVCPFeature(native.handle, INPUT_SOURCE_VCP_CODE, input.value()) };
-        if succeeded == 0 {
-            return Err(last_windows_error("無法切換共用螢幕輸入來源"));
-        }
+            // SAFETY: `native.handle` is an owned, live physical-monitor handle, VCP 0x60 is the
+            // MCCS input-source feature, and `DisplayInput` restricts values to one byte.
+            let succeeded =
+                unsafe { SetVCPFeature(native.handle, INPUT_SOURCE_VCP_CODE, input.value()) };
+            if succeeded == 0 {
+                return Err(last_windows_error("無法切換共用螢幕輸入來源"));
+            }
 
-        Ok(())
+            Ok(())
+        })
+    }
+
+    fn write_power_state(
+        &self,
+        monitor: &MonitorId,
+        state: PowerState,
+    ) -> Result<(), DisplayMuxError> {
+        with_ddc_retry(|| {
+            let native = self.find_native(monitor)?;
+
+            // SAFETY: `native.handle` is an owned, live physical-monitor handle, VCP 0xD6 is the
+            // MCCS power-mode feature, and `PowerState` only ever yields one of its defined values.
+            let succeeded = unsafe {
+                SetVCPFeature(
+                    native.handle,
+                    POWER_MODE_VCP_CODE,
+                    u32::from(state.vcp_value()),
+                )
+            };
+            if succeeded == 0 {
+                return Err(last_windows_error("無法變更共用螢幕電源狀態"));
+            }
+
+            Ok(())
+        })
     }
 }
 

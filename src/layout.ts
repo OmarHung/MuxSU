@@ -53,6 +53,11 @@ function displaysTab(): string {
       <p class="section-hint">${t("settings.inputLabelsHint")}</p>
       <div class="list" id="input-labels"></div>
     </div>
+    <div class="form-section">
+      <h3 class="group-title">${t("settings.maintenance")}</h3>
+      <p class="section-hint">${t("settings.maintenanceHint")}</p>
+      <div class="list" id="display-maintenance"></div>
+    </div>
     <div class="note glass"><i data-lucide="info"></i><p><b>${t("settings.detectionTitle")}</b>${t("settings.detectionBody")}</p></div>
   </section>`;
 }

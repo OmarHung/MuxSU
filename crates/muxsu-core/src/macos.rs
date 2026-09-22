@@ -7,10 +7,11 @@ use crate::{
     capabilities, edid,
     macos_connection::{self, DisplayLink},
     DisplayInput, DisplayMuxError, MonitorControl, MonitorDescriptor, MonitorFingerprint,
-    MonitorId, MonitorResolution,
+    MonitorId, MonitorResolution, PowerState,
 };
 
 const INPUT_SELECT_VCP_CODE: u8 = 0x60;
+const POWER_MODE_VCP_CODE: u8 = 0xd6;
 /// macOS Type-C/USB-C DDC/CI transports intermittently return malformed
 /// packets (e.g. "invalid DDC/CI length") even when the channel is
 /// otherwise healthy; a short retry with a fresh monitor lookup resolves
@@ -146,6 +147,22 @@ impl MonitorControl for MacOsMonitorController {
             "顯示器未執行輸入切換指令（要求 {:#x}）：這台顯示器的韌體可能不支援透過 DDC/CI 遠端切換輸入源",
             input.value()
         )))
+    }
+
+    /// Unlike an input switch, this is not read back: a display that took the
+    /// off command has no DDC/CI answer to give until it is back on, so a
+    /// failed read here would report a working power cycle as a failure.
+    fn write_power_state(
+        &self,
+        monitor_id: &MonitorId,
+        state: PowerState,
+    ) -> Result<(), DisplayMuxError> {
+        with_ddc_retry(|| {
+            let mut monitor = find_monitor(monitor_id)?;
+            monitor
+                .set_vcp_feature(POWER_MODE_VCP_CODE, state.vcp_value())
+                .map_err(backend_error)
+        })
     }
 }
 
