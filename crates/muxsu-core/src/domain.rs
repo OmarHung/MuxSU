@@ -177,19 +177,15 @@ impl DisplayInput {
 
 /// The display's own power, as MCCS VCP 0xD6 states it.
 ///
-/// Every state a display can be *brought back* from. 0x05, the deepest off,
-/// is deliberately absent: displays implement it as a one-way write, and one
-/// that takes it and does not take 0x01 can only be turned on again by hand —
-/// exactly the button this is meant to save the user (an MSI MPG 274U
-/// declares `D6(05)` and nothing else).
+/// The two states a power cycle uses. 0x05, the deepest off, is deliberately
+/// absent: displays implement it as a one-way write, and a display that takes
+/// it may have nothing that brings it back — exactly the power button this is
+/// meant to save the user.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum PowerState {
     On,
-    /// Blanks the panel; the display's controller stays awake.
-    Standby,
-    Suspend,
-    /// DPMS off. Deepest state a display is expected to come back from.
+    /// DPMS off, the deepest state a display is expected to come back from.
     Off,
 }
 
@@ -197,8 +193,6 @@ impl PowerState {
     pub const fn vcp_value(self) -> u16 {
         match self {
             Self::On => 0x01,
-            Self::Standby => 0x02,
-            Self::Suspend => 0x03,
             Self::Off => 0x04,
         }
     }

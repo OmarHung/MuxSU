@@ -9,16 +9,6 @@ pub(crate) fn parse_input_sources(capabilities: &[u8]) -> Vec<DisplayInput> {
         .collect()
 }
 
-/// The values declared for VCP 0xD6, the display's own power state.
-///
-/// `None` when the display does not name the feature, or names it without a
-/// value list — either way nothing is known and nothing may be concluded. An
-/// empty list is impossible: a declared feature with no readable value reads
-/// as `None` too.
-pub(crate) fn parse_power_states(capabilities: &[u8]) -> Option<Vec<u32>> {
-    declared_values(capabilities, "d6").filter(|values| !values.is_empty())
-}
-
 /// The sorted, de-duplicated one-byte values a `vcp(...)` group declares for
 /// one feature code.
 fn declared_values(capabilities: &[u8], code: &str) -> Option<Vec<u32>> {
@@ -100,29 +90,6 @@ mod tests {
     fn does_not_confuse_other_feature_values_with_inputs() {
         assert!(parse_input_sources(b"(vcp(10 12(60) D6(01 04)))").is_empty());
         assert!(parse_input_sources(b"(type(LCD))").is_empty());
-    }
-
-    /// Observed on an MSI MPG 274U: the display declares VCP 0xD6 with the
-    /// one value 0x05 — the deepest off — and never declares 0x01, so DDC/CI
-    /// can turn it off and nothing can turn it back on.
-    #[test]
-    fn reads_the_power_states_a_display_declares() {
-        let msi = b"(prot(monitor)type(lcd)MStarcmds(01 02 03)vcp(02 04 C8 C9 D6(05) DC(00 02) DF FD)mccs_ver(2.1))";
-        let acer =
-            b"(prot(monitor)type(LCD)vcp(02 04 CC(01 02) D6(01 04 05) DF E0(00 03))mccs_ver(2.2))";
-
-        assert_eq!(parse_power_states(msi), Some(vec![0x05]));
-        assert_eq!(parse_power_states(acer), Some(vec![0x01, 0x04, 0x05]));
-    }
-
-    /// A feature named without a value list says nothing about which values it
-    /// takes, and neither does one that is missing. Both must read as unknown,
-    /// because refusing on either would refuse on most displays.
-    #[test]
-    fn a_display_that_declares_no_power_values_is_not_read_as_declaring_none() {
-        assert_eq!(parse_power_states(b"(vcp(02 04 D6 DF))"), None);
-        assert_eq!(parse_power_states(b"(vcp(02 04 DF))"), None);
-        assert_eq!(parse_power_states(b"(type(LCD))"), None);
     }
 
     /// A display's capabilities string is not trusted to be well formed. The

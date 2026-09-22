@@ -27,14 +27,17 @@ pub enum MaintenanceError {
     /// The display accepted the off command and would not come back on. Its
     /// own power button is the way back.
     StuckOff(DisplayMuxError),
-    /// The display says which power states it takes, and no cycle can be
-    /// built from them: either it never comes back on over DDC/CI, or it has
-    /// no state to be put into that it comes back from.
-    CannotCycle { declared: Vec<u32> },
 }
 
 /// Turns the display off and back on over DDC/CI (VCP 0xD6), leaving every
 /// input selection as it was, then names its input again on the way out.
+///
+/// What a display declares for 0xD6 is not consulted, because it was measured
+/// against two displays and predicted neither: an MSI MPG 274U declares
+/// `D6(05)` alone — no way on at all, by its own account — and cycles
+/// perfectly, while an Acer VG252Q declares `D6(01 04 05)` and stays dark.
+/// The deepest off, 0x05, is still never sent: it is written one way, and a
+/// display that takes it may have nothing that brings it back.
 ///
 /// The re-assert is for the display's own USB hub or KVM, which binds itself
 /// to the *active input* rather than to the panel. Observed on an MSI MPG
@@ -49,46 +52,18 @@ pub fn power_cycle<C: MonitorControl>(
     controller: &C,
     monitor: &MonitorId,
 ) -> Result<(), MaintenanceError> {
-    // A display that names the power states it takes is the only display this
-    // can be judged from, and it is worth judging: without 0x01 nothing can
-    // turn it on again, and without a state it comes back from there is
-    // nothing safe to put it in. An MSI MPG 274U declares `D6(05)` and
-    // nothing else — the deepest off, written one way — so every command sent
-    // to it was ignored, and the one it would have taken would have left the
-    // panel dark until somebody pressed its power button.
-    let off = match controller.supported_power_states(monitor) {
-        Ok(Some(declared)) => match recoverable_off(&declared) {
-            Some(state) => state,
-            None => return Err(MaintenanceError::CannotCycle { declared }),
-        },
-        // Undeclared, or unreadable. Nothing is known, so the display is asked
-        // the standard way rather than refused on a guess.
-        _ => PowerState::Off,
-    };
-    power_cycle_with(controller, monitor, off, thread::sleep)
-}
-
-/// The deepest state this display both declares and can be brought back from.
-/// `None` when it declares no way back on, or nothing to come back from.
-fn recoverable_off(declared: &[u32]) -> Option<PowerState> {
-    if !declared.contains(&u32::from(PowerState::On.vcp_value())) {
-        return None;
-    }
-    [PowerState::Off, PowerState::Suspend, PowerState::Standby]
-        .into_iter()
-        .find(|state| declared.contains(&u32::from(state.vcp_value())))
+    power_cycle_with(controller, monitor, thread::sleep)
 }
 
 fn power_cycle_with<C: MonitorControl>(
     controller: &C,
     monitor: &MonitorId,
-    off: PowerState,
     mut wait: impl FnMut(Duration),
 ) -> Result<(), MaintenanceError> {
     // Read before the panel goes dark: a display that is off answers nothing.
     let previous = controller.read_input(monitor).ok();
     controller
-        .write_power_state(monitor, off)
+        .write_power_state(monitor, PowerState::Off)
         .map_err(MaintenanceError::Refused)?;
     wait(POWER_OFF_DWELL);
     controller
@@ -146,7 +121,6 @@ mod tests {
         /// Whether each write is accepted, oldest first; the last one repeats.
         writes: RefCell<Vec<Result<(), DisplayMuxError>>>,
         powers: RefCell<Vec<Result<(), DisplayMuxError>>>,
-        declared: Option<Vec<u32>>,
     }
 
     impl FakeController {
@@ -164,11 +138,6 @@ mod tests {
 
         fn with_powers(self, powers: Vec<Result<(), DisplayMuxError>>) -> Self {
             *self.powers.borrow_mut() = powers;
-            self
-        }
-
-        fn declaring(mut self, states: Vec<u32>) -> Self {
-            self.declared = Some(states);
             self
         }
 
@@ -214,13 +183,6 @@ mod tests {
             next(&self.writes, Ok(()))
         }
 
-        fn supported_power_states(
-            &self,
-            _monitor: &MonitorId,
-        ) -> Result<Option<Vec<u32>>, DisplayMuxError> {
-            Ok(self.declared.clone())
-        }
-
         fn write_power_state(
             &self,
             _monitor: &MonitorId,
@@ -238,9 +200,7 @@ mod tests {
         let controller = FakeController::reading(vec![Ok(input(0x11))]);
         let mut waits = Vec::new();
 
-        let result = power_cycle_with(&controller, &monitor(), PowerState::Off, |delay| {
-            waits.push(delay)
-        });
+        let result = power_cycle_with(&controller, &monitor(), |delay| waits.push(delay));
 
         assert_eq!(result, Ok(()));
         assert_eq!(
@@ -261,7 +221,7 @@ mod tests {
     fn an_unreadable_display_is_restarted_without_being_told_an_input() {
         let controller = FakeController::reading(vec![Err(backend())]);
 
-        let result = power_cycle_with(&controller, &monitor(), PowerState::Off, |_| {});
+        let result = power_cycle_with(&controller, &monitor(), |_| {});
 
         assert_eq!(result, Ok(()));
         assert_eq!(
@@ -282,62 +242,14 @@ mod tests {
         let controller =
             FakeController::reading(vec![Ok(input(0x11))]).with_writes(vec![Err(backend())]);
 
-        assert_eq!(
-            power_cycle_with(&controller, &monitor(), PowerState::Off, |_| {}),
-            Ok(())
-        );
-    }
-
-    /// Observed on an MSI MPG 274U, which declares `D6(05)` and nothing else:
-    /// the only state it takes is the one it cannot be woken from, so the
-    /// display is left alone rather than left dark.
-    #[test]
-    fn a_display_with_no_way_back_on_is_never_turned_off() {
-        let controller = FakeController::default().declaring(vec![0x05]);
-
-        let result = power_cycle(&controller, &monitor());
-
-        assert_eq!(
-            result,
-            Err(MaintenanceError::CannotCycle {
-                declared: vec![0x05]
-            })
-        );
-        assert!(controller.calls().is_empty());
-    }
-
-    #[test]
-    fn the_deepest_state_a_display_can_come_back_from_is_the_one_it_is_put_in() {
-        assert_eq!(recoverable_off(&[0x01, 0x04, 0x05]), Some(PowerState::Off));
-        assert_eq!(
-            recoverable_off(&[0x01, 0x02, 0x05]),
-            Some(PowerState::Standby)
-        );
-        assert_eq!(
-            recoverable_off(&[0x01, 0x03, 0x04]),
-            Some(PowerState::Off),
-            "off is deeper than suspend"
-        );
-        // No way back on, or nothing to come back from.
-        assert_eq!(recoverable_off(&[0x04, 0x05]), None);
-        assert_eq!(recoverable_off(&[0x01]), None);
-    }
-
-    /// A display that declares nothing is asked the standard way: silence is
-    /// not evidence, and most displays say nothing at all about 0xD6.
-    #[test]
-    fn a_display_that_declares_nothing_is_still_asked() {
-        let controller = FakeController::reading(vec![Ok(input(0x11))]);
-
-        assert_eq!(power_cycle(&controller, &monitor()), Ok(()));
-        assert!(controller.calls().contains(&Call::Power(PowerState::Off)));
+        assert_eq!(power_cycle_with(&controller, &monitor(), |_| {}), Ok(()));
     }
 
     #[test]
     fn a_display_that_refuses_to_turn_off_is_left_alone() {
         let controller = FakeController::default().with_powers(vec![Err(backend())]);
 
-        let result = power_cycle_with(&controller, &monitor(), PowerState::Off, |_| {});
+        let result = power_cycle_with(&controller, &monitor(), |_| {});
 
         assert_eq!(result, Err(MaintenanceError::Refused(backend())));
         assert_eq!(
@@ -353,7 +265,7 @@ mod tests {
     fn a_display_that_will_not_wake_is_reported_as_left_off() {
         let controller = FakeController::default().with_powers(vec![Ok(()), Err(backend())]);
 
-        let result = power_cycle_with(&controller, &monitor(), PowerState::Off, |_| {});
+        let result = power_cycle_with(&controller, &monitor(), |_| {});
 
         assert_eq!(result, Err(MaintenanceError::StuckOff(backend())));
     }

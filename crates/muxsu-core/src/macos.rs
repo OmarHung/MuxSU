@@ -149,17 +149,6 @@ impl MonitorControl for MacOsMonitorController {
         )))
     }
 
-    fn supported_power_states(
-        &self,
-        monitor_id: &MonitorId,
-    ) -> Result<Option<Vec<u32>>, DisplayMuxError> {
-        with_ddc_retry(|| {
-            let mut monitor = find_monitor(monitor_id)?;
-            let raw = monitor.capabilities_string().map_err(backend_error)?;
-            Ok(capabilities::parse_power_states(&raw))
-        })
-    }
-
     /// Unlike an input switch, this is not read back: a display that took the
     /// off command has no DDC/CI answer to give until it is back on, so a
     /// failed read here would report a working power cycle as a failure.

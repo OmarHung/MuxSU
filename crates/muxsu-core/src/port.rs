@@ -19,17 +19,6 @@ pub trait MonitorControl {
 
     fn write_input(&self, monitor: &MonitorId, input: DisplayInput) -> Result<(), DisplayMuxError>;
 
-    /// The values the display declares for VCP 0xD6 in its capabilities
-    /// string. `None` when it names the feature without a value list, or does
-    /// not name it at all: both mean nothing is known, and neither may be
-    /// read as "it takes none".
-    fn supported_power_states(
-        &self,
-        _monitor: &MonitorId,
-    ) -> Result<Option<Vec<u32>>, DisplayMuxError> {
-        Ok(None)
-    }
-
     /// Writes the display's own power state (VCP 0xD6), leaving every input
     /// selection as it is.
     ///

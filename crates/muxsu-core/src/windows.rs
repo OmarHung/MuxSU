@@ -216,17 +216,6 @@ impl MonitorControl for WindowsMonitorController {
         })
     }
 
-    fn supported_power_states(
-        &self,
-        monitor: &MonitorId,
-    ) -> Result<Option<Vec<u32>>, DisplayMuxError> {
-        with_ddc_retry(|| {
-            Ok(capabilities::parse_power_states(
-                &self.read_capabilities(monitor)?,
-            ))
-        })
-    }
-
     fn write_input(&self, monitor: &MonitorId, input: DisplayInput) -> Result<(), DisplayMuxError> {
         with_ddc_retry(|| {
             let native = self.find_native(monitor)?;
