@@ -409,6 +409,12 @@ document.querySelector<HTMLInputElement>("#host-switcher-enabled")?.addEventList
 document.querySelector<HTMLButtonElement>("#shortcut-recorder")?.addEventListener("click", beginShortcutRecording);
 document.addEventListener("keydown", captureShortcut, true);
 document.querySelector("#monitor-picker")?.addEventListener("click", (event) => {
+  const maintain = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-maintain]");
+  if (maintain?.dataset.monitorKey) {
+    const monitorKey = maintain.dataset.monitorKey;
+    void withBusyButton(maintain, () => maintainDisplay(maintain.dataset.maintain ?? "", monitorKey));
+    return;
+  }
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-monitor-id]");
   const monitorId = button?.dataset.monitorId;
   const busyKey = button?.dataset.busyKey;
@@ -418,14 +424,8 @@ document.querySelector("#monitor-picker")?.addEventListener("click", (event) => 
 });
 document.querySelector<HTMLInputElement>("#experimental-enabled")?.addEventListener("change", (event) => {
   showExperimental = setExperimentalEnabled((event.target as HTMLInputElement).checked);
-  renderDisplayMaintenance();
+  renderMonitors();
   refreshIcons();
-});
-document.querySelector("#display-maintenance")?.addEventListener("click", (event) => {
-  const button = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-maintain]");
-  const monitorKey = button?.dataset.monitorKey;
-  if (!button || !monitorKey) return;
-  void withBusyButton(button, () => maintainDisplay(button.dataset.maintain ?? "", monitorKey));
 });
 document.querySelector("#local-input-summary")?.addEventListener("change", (event) => {
   const field = (event.target as HTMLElement).closest<HTMLSelectElement>("[data-local-input]");
@@ -1380,7 +1380,7 @@ function renderState(): void {
   renderShortcutSetting();
   renderSwitchPanel();
   diagnostics.render();
-  renderMonitors(); renderMonitorMerge(); renderPeerList(); renderHostList(); renderLocalInputSummary(); renderInputLabels(); renderDisplayMaintenance(); refreshIcons();
+  renderMonitors(); renderMonitorMerge(); renderPeerList(); renderHostList(); renderLocalInputSummary(); renderInputLabels(); refreshIcons();
   // The tray menu lists the same displays and hosts. Nothing here can do
   // anything about a menu that failed to rebuild; the backend logs it.
   if (!isPreview) void invoke("refresh_tray").catch(() => undefined);
@@ -1502,13 +1502,18 @@ function renderMonitors(): void {
   const elsewhere = uncontrollable.filter(isOnOtherHost);
   const unreachable = uncontrollable.filter((monitor) => !isOnOtherHost(monitor));
   if (!dashboard.monitors.length && !uncontrollable.length) {
-    container.innerHTML = `<p class="empty-note">${t("settings.noMonitors")}</p>`; return;
+    container.innerHTML = `<p class="empty-note">${t("settings.noMonitors")}</p>`;
+    const empty = document.querySelector<HTMLElement>("#maintenance-experimental-note");
+    if (empty) empty.hidden = true;
+    return;
   }
   // A shared display this computer cannot see at all is listed from the saved
   // selection, because it is exactly the one the user may need to remove and
   // nothing enumerates a row for it.
   const absent = dashboard.shared.filter((shared) =>
     ![...dashboard.monitors, ...uncontrollable].some((monitor) => sameDisplay(monitor.fingerprint, shared.fingerprint)));
+  const note = document.querySelector<HTMLElement>("#maintenance-experimental-note");
+  if (note) note.hidden = !showExperimental || !dashboard.shared.length;
   container.innerHTML = [
     ...dashboard.monitors.map((monitor) => selectableMonitorRow(monitor, t("settings.ddcControllable"))),
     ...elsewhere.map((monitor) => selectableMonitorRow(monitor, t("dashboard.onOtherHost"))),
@@ -1609,9 +1614,37 @@ function selectableMonitorRow(monitor: MonitorDescriptor, statusLabel: string, i
       <div class="row-title">${escapeHtml(monitor.name)}</div>
       <div class="row-sub mono">${escapeHtml(fp.manufacturer_id)} / ${escapeHtml(fp.product_code)} / ${escapeHtml(fp.serial_number ?? t("settings.noSerial"))}${escapeHtml(resText)} · ${escapeHtml(statusLabel)}</div>
       ${renderConnection(monitor.connection ?? null)}
+      ${shared?.connection?.sharesUsbData && showExperimental ? `<span class="row-hint is-warn">${escapeHtml(t("settings.usbKvmNote"))}</span>` : ""}
     </div>
-    ${shareToggleHtml(shared?.monitorKey ?? monitor.id, monitor.id, isSelected, monitor.name)}
+    <div class="row-actions">
+      ${maintenanceActionsHtml(shared)}
+      ${shareToggleHtml(shared?.monitorKey ?? monitor.id, monitor.id, isSelected, monitor.name)}
+    </div>
   </div>`;
+}
+
+/**
+ * The maintenance actions for a display that is already shared, which is the
+ * only kind they mean anything for. They sit on the display's own row, where
+ * the display they act on is the one being looked at.
+ *
+ * Re-detection only reads and is always offered. Re-seating the signal writes,
+ * and takes a second host to undo, so it waits for the experimental switch.
+ */
+function maintenanceActionsHtml(shared: SharedMonitorStatus | undefined): string {
+  if (!shared) return "";
+  const key = escapeHtml(shared.monitorKey);
+  const redetect = `<button type="button" class="button small" data-maintain="redetect" data-monitor-key="${key}" title="${escapeHtml(t("settings.redetectHint"))}"><i data-lucide="search"></i>${t("action.redetectDisplay")}</button>`;
+  if (!showExperimental) return redetect;
+  // Only a host that answers and sits on another input can bring the display
+  // back once it leaves, so the button waits for one.
+  const partner = settings.peers.find((peer) =>
+    peer.inputs.some((assignment) => sameDisplay(assignment.monitor, shared.fingerprint)
+      && assignment.input !== selectedMonitorFor(shared)?.localInput));
+  const canResync = selectedMonitorFor(shared)?.localInput != null
+    && partner != null && presenceState(partner.id) !== "offline";
+  return `${redetect}
+      <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(experimental(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable")))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>`;
 }
 
 const hostOutputKeys = {
@@ -1659,54 +1692,8 @@ function renderLocalInputSummary(): void {
   }).join("");
 }
 
-/** Marks the two actions that write to a display nobody has verified this on. */
+/** Marks the action that writes to a display nobody has verified this on. */
 const experimental = (hint: string) => `${t("settings.experimentalTag")} ${hint}`;
-
-/**
- * The recoveries for one shared display, one button each.
- *
- * They are separate buttons because they cost the user different things: a
- * re-detection only reads, a power cycle blanks the panel for a moment, and
- * re-seating the signal sends the display out through another input and back.
- */
-function renderDisplayMaintenance(): void {
-  const container = document.querySelector("#display-maintenance");
-  if (!container) return;
-  if (!dashboard.shared.length) {
-    container.innerHTML = `<p class="empty-note">${t("settings.noMonitors")}</p>`;
-    return;
-  }
-  container.innerHTML = dashboard.shared.map((shared) => {
-    // Re-seating takes two hosts. This computer can send the display away —
-    // it is the one on screen — but it cannot bring it back, because a display
-    // answers DDC/CI only on the input it is showing. So it needs a paired
-    // host that has a port on this display and is not known to be offline;
-    // the backend confirms that host answers before anything moves.
-    const partner = settings.peers.find((peer) =>
-      peer.inputs.some((assignment) => sameDisplay(assignment.monitor, shared.fingerprint)
-        && assignment.input !== selectedMonitorFor(shared)?.localInput));
-    const canResync = selectedMonitorFor(shared)?.localInput != null
-      && partner != null && presenceState(partner.id) !== "offline";
-    const key = escapeHtml(shared.monitorKey);
-    // A display whose USB rides the same cable has a hub or KVM of its own,
-    // and that binding follows the active input: only a real input change
-    // brings it back to this computer.
-    const usbNote = shared.connection?.sharesUsbData && showExperimental
-      ? `<span class="row-hint is-warn">${escapeHtml(t("settings.usbKvmNote"))}</span>` : "";
-    // The one that writes to the display stays out of sight until the user
-    // has turned it on: it can leave the picture on another computer.
-    const writing = !showExperimental ? "" : `
-        <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(experimental(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable")))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>`;
-    return `<div class="row">
-      <div><div class="row-title">${escapeHtml(shared.name)}</div><span class="row-hint">${escapeHtml(shared.statusText)}</span>${usbNote}</div>
-      <div class="row-actions">
-        <button type="button" class="button small" data-maintain="redetect" data-monitor-key="${key}" title="${escapeHtml(t("settings.redetectHint"))}"><i data-lucide="search"></i>${t("action.redetectDisplay")}</button>${writing}
-      </div>
-    </div>`;
-  }).join("");
-  const note = document.querySelector<HTMLElement>("#maintenance-experimental-note");
-  if (note) note.hidden = !showExperimental;
-}
 
 /** Hosts whose saved input for `shared` is `value`, by route id. */
 function inputUserRoutes(shared: SharedMonitorStatus, value: number): string[] {
@@ -1764,7 +1751,6 @@ function renderInputNames(): void {
   renderLocalInputSummary();
   renderHostList();
   renderInputLabels();
-  renderDisplayMaintenance();
   renderSwitchPanel();
   refreshIcons();
 }

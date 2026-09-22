@@ -96,8 +96,6 @@ const zhTW: Record<keyof typeof en, string> = {
   "settings.unsaved": "這裡的變更需要按下「儲存設定」才會保存",
   "settings.inputsUnknown": "尚未讀取到這台螢幕的輸入",
   "settings.localInputAria": "{monitor} 這台電腦使用的輸入",
-  "settings.maintenance": "螢幕維護",
-  "settings.maintenanceHint": "畫面沒回來、或輸入清單看起來不對時用。這些動作只作用在螢幕本身，不會更動任何主機的設定。",
   "settings.experimentalTitle": "實驗性功能：",
   "settings.experimentalBody": "「重送訊號」只在一組螢幕與主機上驗證過（MSI MPG 274U，Mac ↔ Windows）。它會把畫面送到另一台主機再請對方切回來，對方沒有回應時就不會動螢幕；萬一切不回來，可以用螢幕上的按鍵，或在另一台電腦上切回來。「重新偵測」只做讀取，不在此列。",
   "settings.experimentalTag": "（實驗性）",

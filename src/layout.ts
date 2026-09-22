@@ -43,6 +43,7 @@ function displaysTab(): string {
     <div class="form-section first">
       <h3 class="group-title">${t("settings.sharedDisplays")}</h3>
       <div class="list" id="monitor-picker"></div>
+      <div class="note glass" id="maintenance-experimental-note" hidden><i data-lucide="flask-conical"></i><p><b>${t("settings.experimentalTitle")}</b>${t("settings.experimentalBody")}</p></div>
       <div class="monitor-merge" id="monitor-merge"></div>
     </div>
     <div class="form-section">
@@ -53,12 +54,6 @@ function displaysTab(): string {
       <h3 class="group-title">${t("settings.inputLabels")}</h3>
       <p class="section-hint">${t("settings.inputLabelsHint")}</p>
       <div class="list" id="input-labels"></div>
-    </div>
-    <div class="form-section">
-      <h3 class="group-title">${t("settings.maintenance")}</h3>
-      <p class="section-hint">${t("settings.maintenanceHint")}</p>
-      <div class="list" id="display-maintenance"></div>
-      <div class="note glass" id="maintenance-experimental-note" hidden><i data-lucide="flask-conical"></i><p><b>${t("settings.experimentalTitle")}</b>${t("settings.experimentalBody")}</p></div>
     </div>
     <div class="note glass"><i data-lucide="info"></i><p><b>${t("settings.detectionTitle")}</b>${t("settings.detectionBody")}</p></div>
   </section>`;

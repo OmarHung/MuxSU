@@ -212,8 +212,6 @@ const en = {
   "settings.unsaved": "Changes here are kept only once you press Save",
   "settings.inputsUnknown": "This display\u2019s inputs have not been read yet",
   "settings.localInputAria": "Input this computer uses on {monitor}",
-  "settings.maintenance": "Display maintenance",
-  "settings.maintenanceHint": "For when the picture does not come back, or the input list looks wrong. These act on the display itself and change no host\u2019s settings.",
   "settings.experimentalTitle": "Experimental: ",
   "settings.experimentalBody": "Re-seat signal has been verified on one display and one pair of hosts (an MSI MPG 274U, Mac to Windows). It sends the picture to another host and asks that host to switch it back, and moves nothing when that host does not answer; if it cannot be brought back, the display\u2019s own buttons or MuxSU on the other computer will do it. Re-detect only reads, and is not experimental.",
   "settings.experimentalTag": "(Experimental)",
