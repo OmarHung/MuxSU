@@ -120,6 +120,26 @@ code, kbd, .mono { font-family: var(--font-mono); }
 .button.danger { color: var(--danger); }
 .button.small { min-height: 28px; padding: 4px 12px; font-size: 12px; }
 
+/* Reads as its icon until pointed at or focused. The row these sit on already
+   names the display they act on, and spelling every action out left the
+   display's own details nowhere to go. The label stays in the markup, so it is
+   still the button's name for anything that reads rather than looks. */
+.button.reveals-label { gap: 0; padding-inline: 9px; }
+.button.reveals-label > span {
+  display: inline-block;
+  max-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  opacity: 0;
+  transition: max-width var(--fast) var(--ease), opacity var(--fast) var(--ease),
+    margin-inline-start var(--fast) var(--ease);
+}
+.button.reveals-label:hover > span, .button.reveals-label:focus-visible > span {
+  max-width: 7rem;
+  margin-inline-start: 7px;
+  opacity: 1;
+}
+
 .button:disabled, .scan-button:disabled, .save-button:disabled, .cancel-button:disabled { opacity: 0.45; }
 .is-busy { opacity: 0.6; pointer-events: none; }
 

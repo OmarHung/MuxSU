@@ -1634,7 +1634,7 @@ function selectableMonitorRow(monitor: MonitorDescriptor, statusLabel: string, i
 function maintenanceActionsHtml(shared: SharedMonitorStatus | undefined): string {
   if (!shared) return "";
   const key = escapeHtml(shared.monitorKey);
-  const redetect = `<button type="button" class="button small" data-maintain="redetect" data-monitor-key="${key}" title="${escapeHtml(t("settings.redetectHint"))}"><i data-lucide="search"></i>${t("action.redetectDisplay")}</button>`;
+  const redetect = `<button type="button" class="button small reveals-label" data-maintain="redetect" data-monitor-key="${key}" title="${escapeHtml(t("settings.redetectHint"))}"><i data-lucide="search"></i><span>${t("action.redetectDisplay")}</span></button>`;
   if (!showExperimental) return redetect;
   // Only a host that answers and sits on another input can bring the display
   // back once it leaves, so the button waits for one.
@@ -1644,7 +1644,7 @@ function maintenanceActionsHtml(shared: SharedMonitorStatus | undefined): string
   const canResync = selectedMonitorFor(shared)?.localInput != null
     && partner != null && presenceState(partner.id) !== "offline";
   return `${redetect}
-      <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(experimental(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable")))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>`;
+      <button type="button" class="button small reveals-label" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(experimental(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable")))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i><span>${t("action.resyncInput")}</span></button>`;
 }
 
 const hostOutputKeys = {
