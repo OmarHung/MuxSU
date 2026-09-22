@@ -108,7 +108,7 @@ const zhTW: Record<keyof typeof en, string> = {
   "settings.redetectHint": "重新向螢幕讀取它接受哪些輸入、目前顯示哪一個。讀不到時會保留原本的設定。",
   "settings.resyncHint": "把螢幕切到另一台主機的輸入再切回來，讓它重新接上這台電腦，螢幕內建的 USB／KVM 也會跟著回到這台。畫面離開後只有那台主機能把它切回來，所以會先確認它有回應；沒有回應就不會動螢幕。",
   "settings.resyncUnavailable": "需要先設定這台電腦的輸入，而且要有另一台已配對、目前有回應、並且在這台螢幕上使用其他輸入的主機——畫面離開後要靠它切回來。",
-  "settings.powerCycleHint": "關閉螢幕再開啟，不更動任何輸入設定。部分螢幕韌體不接受這個指令。",
+  "settings.powerCycleHint": "關閉螢幕再開啟，不更動任何輸入設定。送出前會先讀螢幕宣告的電源指令；螢幕若沒有宣告開機指令，就不會把它關掉。",
   "settings.powerCycleUsbNote": "這台螢幕的 USB 走同一條線：螢幕內建的 USB／KVM 綁在目前作用中的輸入上，重啟螢幕不會把它帶回來。要把鍵盤滑鼠拉回這台電腦，請按「重送訊號」。",
   "action.redetectDisplay": "重新偵測",
   "action.resyncInput": "重送訊號",

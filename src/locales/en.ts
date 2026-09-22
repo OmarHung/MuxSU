@@ -224,7 +224,7 @@ const en = {
   "settings.redetectHint": "Reads which inputs the display accepts, and which one it is showing, from the display again. What is stored is kept when nothing can be read.",
   "settings.resyncHint": "Sends the display to a paired host\u2019s input and back, so it re-establishes the link to this computer \u2014 and brings the display\u2019s own USB hub or KVM with it. Once it leaves, only that host can switch it back, so it is asked first, and nothing moves if it does not answer.",
   "settings.resyncUnavailable": "Needs this computer\u2019s input set, and a paired host that answers and uses a different input on this display \u2014 it is what switches the display back.",
-  "settings.powerCycleHint": "Turns the display off and back on, changing no input selection. Some display firmware refuses this command.",
+  "settings.powerCycleHint": "Turns the display off and back on, changing no input selection. The display is asked which power commands it takes first, and is never turned off when it declares no way to turn it back on.",
   "settings.powerCycleUsbNote": "This display\u2019s USB shares the same cable: its built-in USB hub or KVM is bound to the active input, and a restart does not bring it back. Use Re-seat signal to bring the keyboard and mouse back to this computer.",
   "action.redetectDisplay": "Re-detect",
   "action.resyncInput": "Re-seat signal",

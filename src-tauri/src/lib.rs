@@ -5165,6 +5165,23 @@ fn maintenance_error_text(error: &MaintenanceError, selected: &SelectedMonitor) 
                 core_user_error(cause.clone())
             ),
         },
+        MaintenanceError::CannotCycle { declared } => {
+            let values = declared
+                .iter()
+                .map(|value| format!("0x{value:02X}"))
+                .collect::<Vec<_>>()
+                .join("、");
+            match UiLocale::current() {
+                UiLocale::TraditionalChinese => format!(
+                    "{} 宣告它的 DDC/CI 電源控制只接受 {values}，沒有開機指令。關掉之後只能按螢幕的實體電源鍵開回來，所以沒有送出任何指令。這台螢幕不支援用 MuxSU 重啟。",
+                    selected.name
+                ),
+                UiLocale::English => format!(
+                    "{} declares that its DDC/CI power control takes only {values}, with no way to turn it back on. It could only be turned off and left off, so nothing was sent. This display cannot be restarted from MuxSU.",
+                    selected.name
+                ),
+            }
+        }
         MaintenanceError::StuckOff(cause) => match UiLocale::current() {
             UiLocale::TraditionalChinese => format!(
                 "{} 已關閉，但沒有接受開啟指令，請按螢幕自己的電源鍵開啟。（{}）",

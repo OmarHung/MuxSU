@@ -156,7 +156,9 @@ impl WindowsMonitorController {
         })
     }
 
-    fn read_capabilities(&self, monitor: &MonitorId) -> Result<Vec<DisplayInput>, DisplayMuxError> {
+    /// The display's raw MCCS capabilities string, which names both the
+    /// inputs it takes and the power states it takes.
+    fn read_capabilities(&self, monitor: &MonitorId) -> Result<Vec<u8>, DisplayMuxError> {
         let native = self.find_native(monitor)?;
         let mut length = 0_u32;
         // SAFETY: the physical-monitor handle is live and `length` is a valid out-pointer.
@@ -177,13 +179,8 @@ impl WindowsMonitorController {
             return Err(last_windows_error("無法讀取螢幕 MCCS capabilities"));
         }
         let end = raw.iter().position(|byte| *byte == 0).unwrap_or(raw.len());
-        let inputs = capabilities::parse_input_sources(&raw[..end]);
-        if inputs.is_empty() {
-            return Err(DisplayMuxError::Backend(
-                "Windows 顯示器 capabilities 未宣告 VCP 0x60 輸入值".to_owned(),
-            ));
-        }
-        Ok(inputs)
+        raw.truncate(end);
+        Ok(raw)
     }
 }
 
@@ -207,7 +204,27 @@ impl MonitorControl for WindowsMonitorController {
     }
 
     fn supported_inputs(&self, monitor: &MonitorId) -> Result<Vec<DisplayInput>, DisplayMuxError> {
-        with_ddc_retry(|| self.read_capabilities(monitor))
+        with_ddc_retry(|| {
+            let raw = self.read_capabilities(monitor)?;
+            let inputs = capabilities::parse_input_sources(&raw);
+            if inputs.is_empty() {
+                return Err(DisplayMuxError::Backend(
+                    "Windows 顯示器 capabilities 未宣告 VCP 0x60 輸入值".to_owned(),
+                ));
+            }
+            Ok(inputs)
+        })
+    }
+
+    fn supported_power_states(
+        &self,
+        monitor: &MonitorId,
+    ) -> Result<Option<Vec<u32>>, DisplayMuxError> {
+        with_ddc_retry(|| {
+            Ok(capabilities::parse_power_states(
+                &self.read_capabilities(monitor)?,
+            ))
+        })
     }
 
     fn write_input(&self, monitor: &MonitorId, input: DisplayInput) -> Result<(), DisplayMuxError> {
