@@ -52,15 +52,11 @@ You can share more than one monitor; each host stores its own input port for eac
 - A global shortcut can summon a small host picker even while the main window is hidden: number keys pick a host, Tab changes the target display.
 - The tray (the menu bar on macOS) switches too: every display to one host, or each display on its own.
 
-**Display maintenance (Restart display and Re-seat signal are experimental)**
+**Display maintenance (Re-seat signal is experimental)**
 
-- Restart display and Re-seat signal write to the display and have been verified on one model, an MSI MPG 274U. Whether they work is up to its firmware, and a failure can leave you reaching for the display's own buttons or switching the picture back from the other computer. Re-detect only reads, and is not experimental.
-
-- When the picture does not come back, settings can restart a shared display on the spot: DDC/CI turns it off and back on, changing no input selection.
-- It can also send the display out through a paired host's input and back, so it re-establishes the link to this computer. Once the display leaves, only the host it is then showing can switch it back, so that host is asked first — and nothing moves if it does not answer.
-- Re-detection reads which inputs the display accepts, and which one it is showing, from the display again. What is stored is kept when nothing can be read.
-- Whether these work is entirely up to the display's firmware, and what a display declares about it cannot be trusted: in testing, the display that declares no support restarts fine, and the one that declares full support goes dark and stays there. Be able to reach the display's own power button before restarting it.
-- A display's built-in USB hub or KVM follows the active input, not the panel's power. A restart does not bring it back; re-seating the signal does — on an MSI MPG 274U the picture and the keyboard and mouse both return to this computer.
+- When the picture does not arrive on an input that is already correct, the display can be sent out through a paired host's input and straight back, so it re-establishes the link to this computer. A display's built-in USB hub or KVM follows the active input, so the keyboard and mouse come back with it (measured on an MSI MPG 274U).
+- Once the display leaves this computer, only the host it is then showing can switch it back. MuxSU asks that host to answer first, and moves nothing when it does not. Turn this on under Experimental in settings; it is hidden by default.
+- Re-detection reads which inputs the display accepts, and which one it is showing, from the display again. What is stored is kept when nothing can be read. It only reads, and is not experimental.
 
 **Also**
 

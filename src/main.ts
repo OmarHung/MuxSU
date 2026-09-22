@@ -1,7 +1,7 @@
 import {
   Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, createIcons, Download, ExternalLink, FlaskConical, Github, Info,
   GripVertical, KeyRound, Keyboard, Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap,
-  Plus, Power, RefreshCw, RotateCcw, Save, Search, SunMoon, Trash2, TriangleAlert, UserRound, Zap,
+  Plus, RefreshCw, RotateCcw, Save, Search, SunMoon, Trash2, TriangleAlert, UserRound, Zap,
 } from "lucide";
 import { getVersion } from "@tauri-apps/api/app";
 import { Channel, invoke } from "@tauri-apps/api/core";
@@ -309,7 +309,7 @@ app.innerHTML = appShellHtml({ releaseRows: releaseHistoryRows(releaseHistoryFal
 
 const iconSet = {
   Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FlaskConical, Github, GripVertical, Info, KeyRound, Keyboard,
-  Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap, Plus, Power, RefreshCw, Save, Search,
+  Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap, Plus, RefreshCw, Save, Search,
   SunMoon, RotateCcw, Trash2, TriangleAlert, UserRound, Zap, ...hostIconSet,
 };
 const refreshIcons = () => createIcons({ icons: iconSet });
@@ -1689,15 +1689,14 @@ function renderDisplayMaintenance(): void {
       && partner != null && presenceState(partner.id) !== "offline";
     const key = escapeHtml(shared.monitorKey);
     // A display whose USB rides the same cable has a hub or KVM of its own,
-    // and that binding follows the active input rather than the panel: an
-    // MSI MPG 274U came back from a power cycle with its USB still detached.
+    // and that binding follows the active input: only a real input change
+    // brings it back to this computer.
     const usbNote = shared.connection?.sharesUsbData && showExperimental
-      ? `<span class="row-hint is-warn">${escapeHtml(t("settings.powerCycleUsbNote"))}</span>` : "";
-    // The two that write to the display stay out of sight until the user has
-    // turned them on: one of them can leave the picture on another computer.
+      ? `<span class="row-hint is-warn">${escapeHtml(t("settings.usbKvmNote"))}</span>` : "";
+    // The one that writes to the display stays out of sight until the user
+    // has turned it on: it can leave the picture on another computer.
     const writing = !showExperimental ? "" : `
-        <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(experimental(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable")))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>
-        <button type="button" class="button small" data-maintain="power" data-monitor-key="${key}" title="${escapeHtml(experimental(t("settings.powerCycleHint")))}"><i data-lucide="power"></i>${t("action.powerCycle")}</button>`;
+        <button type="button" class="button small" data-maintain="resync" data-monitor-key="${key}" title="${escapeHtml(experimental(canResync ? t("settings.resyncHint") : t("settings.resyncUnavailable")))}"${canResync ? "" : " disabled"}><i data-lucide="plug-zap"></i>${t("action.resyncInput")}</button>`;
     return `<div class="row">
       <div><div class="row-title">${escapeHtml(shared.name)}</div><span class="row-hint">${escapeHtml(shared.statusText)}</span>${usbNote}</div>
       <div class="row-actions">
@@ -2232,7 +2231,6 @@ async function mergeSharedMonitor(aliasId: string, primaryId: string): Promise<v
 const MAINTENANCE_COMMANDS: Record<string, string> = {
   redetect: "redetect_display",
   resync: "resync_display_input",
-  power: "power_cycle_display",
 };
 
 async function maintainDisplay(action: string, monitorKey: string): Promise<void> {

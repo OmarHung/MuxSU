@@ -28,9 +28,9 @@ use muxsu_core::{
     derive_pairing_key, AgentAction, AgentClient, AgentDisplayRoute, AgentHostInput, AgentResponse,
     AgentServer, DestinationHost, DiscoveredPeer, DisplayInput, DisplayMuxError, DisplayMuxProfile,
     DisplayMuxService, HostAlias, HostAppearance, InputLabel, LocalHostIdentity, MacAddress,
-    MaintenanceError, MdnsPeerDiscovery, MonitorControl, MonitorDescriptor, MonitorFingerprint,
-    MonitorId, MonitorIdentityLink, PeerDiscovery, PeerEndpoint, ResolutionSource, SwitchMode,
-    SwitchOutcome, WakeTarget, AGENT_PROTOCOL_VERSION, DEFAULT_AGENT_PORT,
+    MdnsPeerDiscovery, MonitorControl, MonitorDescriptor, MonitorFingerprint, MonitorId,
+    MonitorIdentityLink, PeerDiscovery, PeerEndpoint, ResolutionSource, SwitchMode, SwitchOutcome,
+    WakeTarget, AGENT_PROTOCOL_VERSION, DEFAULT_AGENT_PORT,
 };
 use serde::{Deserialize, Serialize};
 use tauri::{ipc::Channel, AppHandle, Emitter, Manager, State};
@@ -4664,41 +4664,6 @@ fn label_error_text(error: input_label::LabelError) -> String {
     }
 }
 
-/// Turns one shared display off and straight back on over DDC/CI (VCP 0xD6),
-/// leaving every input selection exactly as it was.
-///
-/// The recovery for a display that is on the right input and still showing
-/// nothing — the state a switch cannot fix, because as far as every host and
-/// the display itself are concerned the switch already happened.
-#[tauri::command]
-async fn power_cycle_display(
-    monitor_id: String,
-    app: AppHandle,
-) -> Result<OperationResult, String> {
-    run_display_task(app, move |state| {
-        let settings = read_settings(state)?;
-        let selected = find_shared_monitor(&settings, &monitor_id)?.clone();
-        let (controller, target) = live_display(&settings, &selected)?;
-        muxsu_core::power_cycle(&controller, &target)
-            .map_err(|error| maintenance_error_text(&error, &selected))?;
-        Ok(OperationResult {
-            title: ui_text("螢幕已重新啟動", "Display restarted").to_owned(),
-            detail: match UiLocale::current() {
-                UiLocale::TraditionalChinese => {
-                    format!("{} 已關閉再開啟，畫面可能要幾秒才會回來。", selected.name)
-                }
-                UiLocale::English => format!(
-                    "{} was turned off and back on. The picture can take a few seconds to return.",
-                    selected.name
-                ),
-            },
-            peer_woken: false,
-            warning: false,
-        })
-    })
-    .await
-}
-
 /// Sends one shared display out through a paired host's input and straight
 /// back to this computer's, so it re-establishes the link — and a built-in
 /// USB hub or KVM, which follows the active input rather than the panel,
@@ -5152,34 +5117,6 @@ fn present_display<'a>(
 }
 
 /// Every input of this display that a host here is known to use.
-/// What a power cycle left behind, said in the terms the user can act on.
-fn maintenance_error_text(error: &MaintenanceError, selected: &SelectedMonitor) -> String {
-    match error {
-        MaintenanceError::Refused(cause) => match UiLocale::current() {
-            UiLocale::TraditionalChinese => format!(
-                "螢幕沒有接受這個指令，畫面未變更：{}",
-                core_user_error(cause.clone())
-            ),
-            UiLocale::English => format!(
-                "The display did not accept the command and nothing was changed: {}",
-                core_user_error(cause.clone())
-            ),
-        },
-        MaintenanceError::StuckOff(cause) => match UiLocale::current() {
-            UiLocale::TraditionalChinese => format!(
-                "{} 已關閉，但沒有接受開啟指令，請按螢幕自己的電源鍵開啟。（{}）",
-                selected.name,
-                core_user_error(cause.clone())
-            ),
-            UiLocale::English => format!(
-                "{} turned off but refused to come back on. Use the display's own power button. ({})",
-                selected.name,
-                core_user_error(cause.clone())
-            ),
-        },
-    }
-}
-
 async fn receive_input_labels_notice(app: AppHandle, labels: Vec<InputLabel>) -> AgentResponse {
     let applied = tauri::async_runtime::spawn_blocking(move || {
         // Serialize with dashboard scans, which write back a settings snapshot.
@@ -7376,7 +7313,6 @@ pub fn run() -> anyhow::Result<()> {
             set_input_label,
             set_monitor_identity_link,
             set_local_input,
-            power_cycle_display,
             resync_display_input,
             redetect_display,
             reset_settings,
@@ -8797,27 +8733,6 @@ mod tests {
         assert!(message.contains("DP"), "{message}");
         assert!(message.contains("own buttons"), "{message}");
         assert!(message.contains("Peer"), "{message}");
-    }
-
-    /// Refusing the first command changes nothing, and saying so is what keeps
-    /// the user from hunting for a display state that never happened.
-    #[test]
-    fn a_refused_command_says_the_display_was_left_alone() {
-        let shared = monitor("shared");
-        let settings = AppSettings {
-            shared_monitors: vec![SelectedMonitor::from(&shared)],
-            ..AppSettings::default()
-        };
-
-        let message = maintenance_error_text(
-            &MaintenanceError::Refused(DisplayMuxError::Backend(
-                "無法切換共用螢幕輸入來源：timeout".to_owned(),
-            )),
-            &settings.shared_monitors[0],
-        );
-
-        assert!(message.contains("nothing was changed"), "{message}");
-        assert!(!message.contains("無法"), "{message}");
     }
 
     #[test]

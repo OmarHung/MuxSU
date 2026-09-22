@@ -459,12 +459,6 @@
           "markdownDescription": "Enables the install_update command without any pre-configured scope."
         },
         {
-          "description": "Enables the power_cycle_display command without any pre-configured scope.",
-          "type": "string",
-          "const": "allow-power-cycle-display",
-          "markdownDescription": "Enables the power_cycle_display command without any pre-configured scope."
-        },
-        {
           "description": "Enables the prepare_diagnostic_report command without any pre-configured scope.",
           "type": "string",
           "const": "allow-prepare-diagnostic-report",
@@ -715,12 +709,6 @@
           "type": "string",
           "const": "deny-install-update",
           "markdownDescription": "Denies the install_update command without any pre-configured scope."
-        },
-        {
-          "description": "Denies the power_cycle_display command without any pre-configured scope.",
-          "type": "string",
-          "const": "deny-power-cycle-display",
-          "markdownDescription": "Denies the power_cycle_display command without any pre-configured scope."
         },
         {
           "description": "Denies the prepare_diagnostic_report command without any pre-configured scope.",

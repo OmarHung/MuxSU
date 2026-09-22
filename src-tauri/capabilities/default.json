@@ -21,7 +21,6 @@
     "allow-get-input-options",
     "allow-get-settings",
     "allow-install-update",
-    "allow-power-cycle-display",
     "allow-prepare-diagnostic-report",
     "allow-probe-peer",
     "allow-redetect-display",

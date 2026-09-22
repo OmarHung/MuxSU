@@ -19,7 +19,6 @@ const COMMANDS: &[&str] = &[
     "set_input_label",
     "set_monitor_identity_link",
     "set_local_input",
-    "power_cycle_display",
     "resync_display_input",
     "redetect_display",
     "reset_settings",

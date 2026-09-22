@@ -20,12 +20,10 @@ use wmi::WMIConnection;
 
 use crate::{
     capabilities, windows_connection, DisplayInput, DisplayMuxError, MonitorControl,
-    MonitorDescriptor, MonitorFingerprint, MonitorId, MonitorResolution, PowerState,
-    ResolutionSource,
+    MonitorDescriptor, MonitorFingerprint, MonitorId, MonitorResolution, ResolutionSource,
 };
 
 const INPUT_SOURCE_VCP_CODE: u8 = 0x60;
-const POWER_MODE_VCP_CODE: u8 = 0xd6;
 const MAX_CAPABILITIES_LENGTH: u32 = 64 * 1024;
 
 /// Windows reports transient DDC/CI faults on a bus that is otherwise
@@ -226,31 +224,6 @@ impl MonitorControl for WindowsMonitorController {
                 unsafe { SetVCPFeature(native.handle, INPUT_SOURCE_VCP_CODE, input.value()) };
             if succeeded == 0 {
                 return Err(last_windows_error("無法切換共用螢幕輸入來源"));
-            }
-
-            Ok(())
-        })
-    }
-
-    fn write_power_state(
-        &self,
-        monitor: &MonitorId,
-        state: PowerState,
-    ) -> Result<(), DisplayMuxError> {
-        with_ddc_retry(|| {
-            let native = self.find_native(monitor)?;
-
-            // SAFETY: `native.handle` is an owned, live physical-monitor handle, VCP 0xD6 is the
-            // MCCS power-mode feature, and `PowerState` only ever yields one of its defined values.
-            let succeeded = unsafe {
-                SetVCPFeature(
-                    native.handle,
-                    POWER_MODE_VCP_CODE,
-                    u32::from(state.vcp_value()),
-                )
-            };
-            if succeeded == 0 {
-                return Err(last_windows_error("無法變更共用螢幕電源狀態"));
             }
 
             Ok(())
