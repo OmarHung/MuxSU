@@ -7094,6 +7094,10 @@ fn save_diagnostic_report(report_id: String, app: AppHandle) -> Result<String, S
 }
 
 pub fn run() -> anyhow::Result<()> {
+    // Ahead of the builder, because every plugin below initialises before
+    // `setup` starts the log file, and a panic in that window left nothing
+    // behind at all.
+    diagnostics::install_panic_logger();
     let builder = tauri::Builder::default()
         // This must remain the first plugin so a second launch exits before any
         // other plugin or application setup can create duplicate resources.

@@ -94,6 +94,51 @@ pub fn log_directory() -> Option<&'static Path> {
     LOG_DIRECTORY.get().map(PathBuf::as_path)
 }
 
+/// Writes a panic down before the process ends.
+///
+/// Installed first thing in `run`, ahead of every plugin, because a panic
+/// raised while they initialise happens long before `setup` reaches
+/// [`init_logging`] — and with `panic = "abort"` in the release profile it
+/// takes the process with it. On Windows that surfaced as a bare `0xc0000409`
+/// in the event log, an app that vanished a few seconds after opening, and not
+/// one line anywhere saying why.
+///
+/// The rolling log is used once it exists, so a panic sits with the lines
+/// around it and travels with a diagnostic report. Earlier than that there is
+/// no app yet to say where its log directory is, so the panic goes to a fixed
+/// file in the temp directory, which is writable this early.
+pub fn install_panic_logger() {
+    let previous = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic| {
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        // A no-op before `init_logging`, and the usual path afterwards.
+        tracing::error!(panic = %panic, "MuxSU is stopping because of a panic");
+        let seconds = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|since| since.as_secs())
+            .unwrap_or_default();
+        let record = format!("---- panic at unix {seconds} ----\n{panic}\n{backtrace}\n");
+        // Nothing here may fail loudly: a panic inside a panic hook aborts
+        // with even less to show than the panic being reported.
+        let _ = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(panic_log_path(log_directory()))
+            .and_then(|mut file| std::io::Write::write_all(&mut file, record.as_bytes()));
+        previous(panic);
+    }));
+}
+
+/// Where [`install_panic_logger`] writes, given the log directory if logging
+/// has started. Split out from the hook so both halves can be tested without
+/// panicking a test process.
+fn panic_log_path(directory: Option<&Path>) -> PathBuf {
+    match directory {
+        Some(directory) => directory.join(format!("{LOG_FILE_PREFIX}-panic.{LOG_FILE_SUFFIX}")),
+        None => std::env::temp_dir().join(format!("{LOG_FILE_PREFIX}-panic.{LOG_FILE_SUFFIX}")),
+    }
+}
+
 /// The last lines of the newest log files, oldest first.
 fn recent_log_lines(directory: &Path, limit: usize) -> Vec<String> {
     let Ok(entries) = fs::read_dir(directory) else {
@@ -689,6 +734,26 @@ mod tests {
             }],
             ..AppSettings::default()
         }
+    }
+
+    #[test]
+    fn a_panic_before_logging_starts_still_has_somewhere_to_go() {
+        let path = panic_log_path(None);
+
+        assert_eq!(path.parent(), Some(std::env::temp_dir().as_path()));
+        assert_eq!(
+            path.file_name().and_then(|name| name.to_str()),
+            Some("muxsu-panic.log")
+        );
+    }
+
+    #[test]
+    fn a_panic_after_logging_starts_joins_the_other_logs() {
+        let directory = Path::new("/tmp/muxsu-logs");
+
+        let path = panic_log_path(Some(directory));
+
+        assert_eq!(path, directory.join("muxsu-panic.log"));
     }
 
     #[test]
