@@ -456,7 +456,10 @@ struct AppRuntime {
     settings: Arc<RwLock<AppSettings>>,
     settings_path: PathBuf,
     agent_task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
-    discovery: Option<MdnsPeerDiscovery>,
+    /// Filled in once mDNS has started, which is after this runtime is
+    /// managed: starting it first delayed `manage` long enough for the first
+    /// command from the webview to find no state and abort the process.
+    discovery: OnceLock<MdnsPeerDiscovery>,
     /// This computer's discovery id, used to name it in the shared host order.
     local_host_id: String,
     /// The machine name paired hosts discover this computer by. Used as the
@@ -895,7 +898,7 @@ enum UpdateDownloadEvent {
 #[tauri::command]
 async fn discover_peers(state: State<'_, AppRuntime>) -> Result<Vec<DiscoveredPeer>, String> {
     sleep(Duration::from_millis(700)).await;
-    let discovery = state.discovery.as_ref().ok_or_else(|| {
+    let discovery = state.discovery.get().ok_or_else(|| {
         ui_text(
             "無法啟動區域網路搜尋；請確認防火牆允許 MuxSU 使用私人網路",
             "Unable to start local network discovery. Allow MuxSU through the firewall on private networks.",
@@ -913,7 +916,7 @@ async fn select_peer(
     shared_key: Option<String>,
     state: State<'_, AppRuntime>,
 ) -> Result<AppSettings, String> {
-    let discovery = state.discovery.as_ref().ok_or_else(|| {
+    let discovery = state.discovery.get().ok_or_else(|| {
         ui_text(
             "區域網路搜尋目前不可用",
             "Local network discovery is unavailable",
@@ -4107,7 +4110,7 @@ fn set_host_name(
         // advertises, so a rename that stops here is invisible to them.
         let advertised = host_alias::alias_for(&settings.host_aliases, &host_id)
             .unwrap_or(state.local_host_name.as_str());
-        if let Some(discovery) = state.discovery.as_ref() {
+        if let Some(discovery) = state.discovery.get() {
             if let Err(error) = discovery.advertise_name(advertised) {
                 tracing::warn!(error = %error, "unable to advertise this computer's new name");
             }
@@ -5555,7 +5558,7 @@ fn adopt_peer_routes_at_startup(app: &AppHandle) {
         // discovery knows are worth a second try before giving up on it.
         let discovered = runtime
             .discovery
-            .as_ref()
+            .get()
             .and_then(|discovery| discovery.peers().ok())
             .unwrap_or_default();
         let settings = Arc::new(settings);
@@ -7150,16 +7153,6 @@ pub fn run() -> anyhow::Result<()> {
                 .map_err(|error| anyhow::anyhow!(error))?;
             let settings_path = config_dir.join("settings.json");
             let settings = settings_for_current_build(load_settings(&settings_path));
-            #[cfg(debug_assertions)]
-            if let Err(error) = app.autolaunch().disable() {
-                tracing::warn!(error = %error, "unable to remove development autostart entry");
-            }
-            #[cfg(all(target_os = "windows", not(debug_assertions)))]
-            if settings.autostart {
-                if let Err(error) = app.autolaunch().enable() {
-                    tracing::warn!(error = %error, "unable to refresh the login autostart entry");
-                }
-            }
             let detected = LocalHostIdentity::detect(local_host()).unwrap_or_else(|error| {
                 tracing::warn!(error = %error, "unable to read this computer's host name");
                 LocalHostIdentity::from_parts("MuxSU".to_owned(), local_host(), None)
@@ -7168,12 +7161,10 @@ pub fn run() -> anyhow::Result<()> {
             // re-deriving it would silently strand this computer's pairings,
             // its place in the shared host order and its custom name.
             let mut settings = settings;
-            let identity = if settings.local_host_id.is_empty() {
+            let first_run = settings.local_host_id.is_empty();
+            let identity = if first_run {
                 settings.local_host_id = detected.id.clone();
                 ensure_host_input_history(&mut settings);
-                if let Err(error) = persist_settings(&settings_path, &settings) {
-                    tracing::warn!(error = %error, "unable to save this computer's host id");
-                }
                 detected
             } else {
                 LocalHostIdentity::with_id(
@@ -7183,17 +7174,17 @@ pub fn run() -> anyhow::Result<()> {
                     detected.mac_address,
                 )
             };
-            let discovery = MdnsPeerDiscovery::start(&identity, DEFAULT_AGENT_PORT)
-                .map(Some)
-                .unwrap_or_else(|error| {
-                    tracing::warn!(error = %error, "unable to start MuxSU mDNS discovery");
-                    None
-                });
+            // Saved after `manage` below, along with everything else that
+            // touches the disk, the registry or the network.
+            let new_identity_to_save = first_run.then(|| settings.clone());
+            #[cfg(all(target_os = "windows", not(debug_assertions)))]
+            let autostart_wanted = settings.autostart;
+            let discovery_identity = identity.clone();
             app.manage(AppRuntime {
                 settings: Arc::new(RwLock::new(settings)),
-                settings_path,
+                settings_path: settings_path.clone(),
                 agent_task: Mutex::new(None),
-                discovery,
+                discovery: OnceLock::new(),
                 local_host_id: identity.id,
                 local_host_name: identity.name,
                 local_mac_address: identity.mac_address,
@@ -7209,6 +7200,39 @@ pub fn run() -> anyhow::Result<()> {
                     std::collections::HashSet::new(),
                 )),
             });
+            // Past this point the state a command needs exists, so the work
+            // below is free to be slow. Ordered the other way round it was not
+            // merely slow to start: the webview is already loading while
+            // `setup` runs, and on Windows starting mDNS took long enough that
+            // the first command from it reached `State<AppRuntime>` before
+            // `manage` did. Tauri panics there, and `panic = "abort"` turned
+            // that into a window that vanished a few seconds after opening,
+            // with nothing in any log to say why.
+            if let Some(settings) = new_identity_to_save {
+                if let Err(error) = persist_settings(&settings_path, &settings) {
+                    tracing::warn!(error = %error, "unable to save this computer's host id");
+                }
+            }
+            #[cfg(debug_assertions)]
+            if let Err(error) = app.autolaunch().disable() {
+                tracing::warn!(error = %error, "unable to remove development autostart entry");
+            }
+            #[cfg(all(target_os = "windows", not(debug_assertions)))]
+            if autostart_wanted {
+                if let Err(error) = app.autolaunch().enable() {
+                    tracing::warn!(error = %error, "unable to refresh the login autostart entry");
+                }
+            }
+            match MdnsPeerDiscovery::start(&discovery_identity, DEFAULT_AGENT_PORT) {
+                Ok(discovery) => {
+                    if app.state::<AppRuntime>().discovery.set(discovery).is_err() {
+                        tracing::warn!("MuxSU mDNS discovery had already been started");
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(error = %error, "unable to start MuxSU mDNS discovery");
+                }
+            }
             if let Some(runtime) = app.try_state::<AppRuntime>() {
                 let mut settings = read_settings_inner(&runtime).map_err(anyhow::Error::msg)?;
                 if settings.host_switcher_enabled {
