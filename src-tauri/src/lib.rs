@@ -7200,14 +7200,20 @@ pub fn run() -> anyhow::Result<()> {
                     std::collections::HashSet::new(),
                 )),
             });
-            // Past this point the state a command needs exists, so the work
-            // below is free to be slow. Ordered the other way round it was not
-            // merely slow to start: the webview is already loading while
-            // `setup` runs, and on Windows starting mDNS took long enough that
-            // the first command from it reached `State<AppRuntime>` before
-            // `manage` did. Tauri panics there, and `panic = "abort"` turned
-            // that into a window that vanished a few seconds after opening,
-            // with nothing in any log to say why.
+            // Tauri builds every window in its config before it calls this
+            // hook, and a webview that is up starts calling commands at once.
+            // So the first command used to arrive before this hook had run at
+            // all — before the log file, before `manage` — and reading
+            // `State<AppRuntime>` panicked. With `panic = "abort"` that ended
+            // the process: on Windows, a window that opened and vanished a few
+            // seconds later, every time, leaving nothing in any log to say
+            // why. Each window carries `create: false` so Tauri leaves it
+            // alone, and they are built here instead, after `manage` above.
+            for window in app.config().app.windows.clone() {
+                tauri::WebviewWindowBuilder::from_config(app.handle(), &window)?.build()?;
+            }
+            // Past this point the state a command needs exists and the windows
+            // that call them are up, so the work below is free to be slow.
             if let Some(settings) = new_identity_to_save {
                 if let Err(error) = persist_settings(&settings_path, &settings) {
                     tracing::warn!(error = %error, "unable to save this computer's host id");

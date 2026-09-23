@@ -13,6 +13,7 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "MuxSU",
         "dragDropEnabled": false,
         "width": 1440,
@@ -27,6 +28,7 @@
         "label": "switch-notice",
         "title": "MuxSU",
         "url": "switch-notice.html",
+        "create": false,
         "width": 380,
         "height": 190,
         "resizable": false,
@@ -41,6 +43,7 @@
         "label": "host-switcher",
         "title": "MuxSU Host Switcher",
         "url": "host-switcher.html",
+        "create": false,
         "width": 600,
         "height": 480,
         "resizable": false,
