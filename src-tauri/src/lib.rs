@@ -6708,6 +6708,29 @@ fn settings_for_current_build(settings: AppSettings) -> AppSettings {
     settings
 }
 
+/// What this computer advertises itself as: the name its user gave it when
+/// there is one, and the machine name otherwise — the same rule
+/// `set_host_name` applies when a rename happens.
+///
+/// A rename used to reach the advertised record only at the moment it was
+/// made. Starting up again advertised the machine name once more, and a host
+/// that has not paired with this one has nothing but that record to list it
+/// by, so it showed a name its user had already replaced.
+fn advertised_identity(
+    identity: &LocalHostIdentity,
+    aliases: &[muxsu_core::HostAlias],
+) -> LocalHostIdentity {
+    match host_alias::alias_for(aliases, &identity.id) {
+        Some(alias) => LocalHostIdentity::with_id(
+            identity.id.clone(),
+            alias.to_owned(),
+            identity.platform,
+            identity.mac_address.clone(),
+        ),
+        None => identity.clone(),
+    }
+}
+
 fn autostart_args() -> Option<Vec<&'static str>> {
     #[cfg(target_os = "windows")]
     {
@@ -7179,7 +7202,7 @@ pub fn run() -> anyhow::Result<()> {
             let new_identity_to_save = first_run.then(|| settings.clone());
             #[cfg(all(target_os = "windows", not(debug_assertions)))]
             let autostart_wanted = settings.autostart;
-            let discovery_identity = identity.clone();
+            let discovery_identity = advertised_identity(&identity, &settings.host_aliases);
             app.manage(AppRuntime {
                 settings: Arc::new(RwLock::new(settings)),
                 settings_path: settings_path.clone(),
@@ -7380,6 +7403,55 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
+
+    fn local_identity() -> LocalHostIdentity {
+        LocalHostIdentity::with_id(
+            "host-1".to_owned(),
+            "Omars-MacBook-Pro-M4-Pro.local".to_owned(),
+            DestinationHost::Mac,
+            None,
+        )
+    }
+
+    #[test]
+    fn a_renamed_computer_still_advertises_that_name_after_a_restart() {
+        let identity = local_identity();
+        let aliases = vec![muxsu_core::HostAlias {
+            host_id: "host-1".to_owned(),
+            name: "Omar 的 MacBook".to_owned(),
+            updated_at_ms: 1,
+        }];
+
+        let advertised = advertised_identity(&identity, &aliases);
+
+        assert_eq!(advertised.name, "Omar 的 MacBook");
+        assert_eq!(advertised.id, identity.id);
+    }
+
+    #[test]
+    fn a_computer_that_was_never_renamed_advertises_its_machine_name() {
+        let identity = local_identity();
+
+        let advertised = advertised_identity(&identity, &[]);
+
+        assert_eq!(advertised.name, "Omars-MacBook-Pro-M4-Pro.local");
+    }
+
+    #[test]
+    fn a_cleared_name_falls_back_to_the_machine_name() {
+        let identity = local_identity();
+        // An empty alias records a name the user cleared, so it must not be
+        // advertised as this computer's name.
+        let aliases = vec![muxsu_core::HostAlias {
+            host_id: "host-1".to_owned(),
+            name: String::new(),
+            updated_at_ms: 2,
+        }];
+
+        let advertised = advertised_identity(&identity, &aliases);
+
+        assert_eq!(advertised.name, "Omars-MacBook-Pro-M4-Pro.local");
+    }
 
     #[test]
     fn update_install_error_keeps_the_download_status() {
