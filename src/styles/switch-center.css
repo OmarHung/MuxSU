@@ -454,4 +454,6 @@ button.matrix-cell:hover:not(:disabled) small { color: var(--c); }
   transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
 }
 .group-chip:hover { color: var(--text); }
-.group-chip.is-active { color: var(--accent-text); background: var(--accent); }
+/* `--accent-text` is accent-coloured text, not text that sits on accent, so
+   the active chip takes white like .icon-button.has-update does. */
+.group-chip.is-active { color: #fff; background: var(--accent); }
