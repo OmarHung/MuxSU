@@ -7,10 +7,11 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use super::{
-    build_host_switcher_state, read_settings, report_failure_if_allowed, run_host_switch,
-    show_main_window, ui_text, AppRuntime, HostSwitcherMonitor, UiLocale,
-    ACTIVE_ROUTE_CHANGED_EVENT, HOST_NAMES_CHANGED_EVENT, HOST_ORDER_CHANGED_EVENT,
-    MONITOR_IDENTITIES_CHANGED_EVENT, PEER_INPUTS_CHANGED_EVENT, SWITCH_NOTICE_EVENT,
+    apply_active_group, build_host_switcher_state, host_group, read_settings,
+    report_failure_if_allowed, run_host_switch, show_main_window, ui_text, AppRuntime,
+    HostSwitcherMonitor, UiLocale, ACTIVE_ROUTE_CHANGED_EVENT, HOST_GROUPS_CHANGED_EVENT,
+    HOST_NAMES_CHANGED_EVENT, HOST_ORDER_CHANGED_EVENT, MONITOR_IDENTITIES_CHANGED_EVENT,
+    PEER_INPUTS_CHANGED_EVENT, SWITCH_NOTICE_EVENT,
 };
 use tauri::{
     ipc::Channel,
@@ -32,10 +33,12 @@ const QUIT_ID: &str = "tray-quit";
 const ID_SEPARATOR: char = '\n';
 const SWITCH_ONE_PREFIX: &str = "tray-one";
 const SWITCH_ALL_PREFIX: &str = "tray-all";
+const SHOW_GROUP_PREFIX: &str = "tray-group";
 
 /// Whatever changes a host's name, order, port or the host a display shows
 /// changes the menu too.
-const MENU_EVENTS: [&str; 5] = [
+const MENU_EVENTS: [&str; 6] = [
+    HOST_GROUPS_CHANGED_EVENT,
     ACTIVE_ROUTE_CHANGED_EVENT,
     HOST_ORDER_CHANGED_EVENT,
     HOST_NAMES_CHANGED_EVENT,
@@ -133,6 +136,10 @@ enum TrayAction {
     SwitchAll {
         host_id: String,
     },
+    /// An empty id goes back to showing every display and host.
+    ShowGroup {
+        group_id: String,
+    },
 }
 
 fn parse_action(id: &str) -> Option<TrayAction> {
@@ -152,6 +159,9 @@ fn parse_action(id: &str) -> Option<TrayAction> {
         (SWITCH_ALL_PREFIX, Some(host_id), None, None) => Some(TrayAction::SwitchAll {
             host_id: host_id.to_owned(),
         }),
+        (SHOW_GROUP_PREFIX, Some(group_id), None, None) => Some(TrayAction::ShowGroup {
+            group_id: group_id.to_owned(),
+        }),
         _ => None,
     }
 }
@@ -162,6 +172,28 @@ fn switch_one_id(monitor_key: &str, host_id: &str) -> String {
 
 fn switch_all_id(host_id: &str) -> String {
     format!("{SWITCH_ALL_PREFIX}{ID_SEPARATOR}{host_id}")
+}
+
+fn show_group_id(group_id: &str) -> String {
+    format!("{SHOW_GROUP_PREFIX}{ID_SEPARATOR}{group_id}")
+}
+
+/// This computer's groups and the one being shown, for the menu.
+fn current_groups(app: &AppHandle) -> (Vec<host_group::HostGroup>, String) {
+    let state = app.state::<AppRuntime>();
+    match read_settings(&state) {
+        Ok(settings) => {
+            let active =
+                host_group::active_group(&settings.host_groups, &settings.active_host_group)
+                    .map(|group| group.id.clone())
+                    .unwrap_or_default();
+            (settings.host_groups, active)
+        }
+        Err(error) => {
+            tracing::warn!(error = %error, "unable to read the groups for the tray menu");
+            (Vec::new(), String::new())
+        }
+    }
 }
 
 /// Displays a switch to `host_id` would change: those that have a port for it
@@ -203,11 +235,39 @@ fn label(text: &str) -> String {
 }
 
 /// Everything the menu shows, in the language it shows it in.
-fn signature(monitors: &[HostSwitcherMonitor], switching: Option<&str>) -> String {
+fn signature(
+    monitors: &[HostSwitcherMonitor],
+    switching: Option<&str>,
+    groups: &(Vec<host_group::HostGroup>, String),
+) -> String {
     format!(
-        "{}\u{0}{switching:?}\u{0}{monitors:?}",
+        "{}\u{0}{switching:?}\u{0}{monitors:?}\u{0}{groups:?}",
         ui_text("zh-TW", "en")
     )
+}
+
+/// The groups as check items, with the one being shown checked. "All displays"
+/// leads, so there is always a way back out of a group.
+fn group_items(
+    app: &AppHandle,
+    groups: &[host_group::HostGroup],
+    active_id: &str,
+) -> tauri::Result<Vec<tauri::menu::CheckMenuItem<Wry>>> {
+    std::iter::once(
+        CheckMenuItemBuilder::new(label(ui_text("全部螢幕與主機", "All displays and hosts")))
+            .id(show_group_id(""))
+            .checked(active_id.is_empty())
+            .enabled(!active_id.is_empty())
+            .build(app),
+    )
+    .chain(groups.iter().map(|group| {
+        CheckMenuItemBuilder::new(label(&group.name))
+            .id(show_group_id(&group.id))
+            .checked(group.id == active_id)
+            .enabled(group.id != active_id)
+            .build(app)
+    }))
+    .collect()
 }
 
 /// The hosts of one display as check items; the host on screen is checked.
@@ -235,8 +295,9 @@ fn host_items(
 pub(super) fn build_menu(app: &AppHandle) -> tauri::Result<Menu<Wry>> {
     let monitors = current_monitors(app);
     let switching = switching_host();
-    let menu = menu_for(app, &monitors, switching.as_deref())?;
-    remember(Some(signature(&monitors, switching.as_deref())));
+    let groups = current_groups(app);
+    let menu = menu_for(app, &monitors, switching.as_deref(), &groups)?;
+    remember(Some(signature(&monitors, switching.as_deref(), &groups)));
     Ok(menu)
 }
 
@@ -271,6 +332,7 @@ fn menu_for(
     app: &AppHandle,
     monitors: &[HostSwitcherMonitor],
     switching: Option<&str>,
+    groups: &(Vec<host_group::HostGroup>, String),
 ) -> tauri::Result<Menu<Wry>> {
     let mut menu = MenuBuilder::new(app);
     let busy = switching.is_some();
@@ -317,6 +379,14 @@ fn menu_for(
             menu = menu.separator();
         }
     }
+    let (defined, active_id) = groups;
+    if !defined.is_empty() {
+        let mut submenu = SubmenuBuilder::new(app, label(ui_text("群組", "Groups")));
+        for item in group_items(app, defined, active_id)? {
+            submenu = submenu.item(&item);
+        }
+        menu = menu.item(&submenu.build()?).separator();
+    }
     menu.text(OPEN_ID, ui_text("開啟 MuxSU", "Open MuxSU"))
         .separator()
         .text(QUIT_ID, ui_text("結束 MuxSU", "Quit MuxSU"))
@@ -331,11 +401,12 @@ pub(super) fn refresh_menu(app: &AppHandle) {
     };
     let monitors = current_monitors(app);
     let switching = switching_host();
-    let shown = signature(&monitors, switching.as_deref());
+    let groups = current_groups(app);
+    let shown = signature(&monitors, switching.as_deref(), &groups);
     if is_showing(&shown) {
         return;
     }
-    match menu_for(app, &monitors, switching.as_deref()) {
+    match menu_for(app, &monitors, switching.as_deref(), &groups) {
         Ok(menu) => match tray.set_menu(Some(menu)) {
             Ok(()) => remember(Some(shown)),
             Err(error) => tracing::warn!(error = %error, "unable to update the tray menu"),
@@ -555,6 +626,12 @@ pub(super) fn handle_menu_event(app: &AppHandle, id: &str) {
                 vec![job_for(&monitors, &monitor_key, &host_id)],
             );
         }
+        Some(TrayAction::ShowGroup { group_id }) => {
+            let state = app.state::<AppRuntime>();
+            if let Err(error) = apply_active_group(&state, app, &group_id) {
+                tracing::warn!(error = %error, "unable to show that group from the tray menu");
+            }
+        }
         Some(TrayAction::SwitchAll { host_id }) => {
             let monitors = current_monitors(app);
             let jobs = switch_targets(&monitors, &host_id)
@@ -594,6 +671,20 @@ mod tests {
         match parse_action(&switch_all_id("local")) {
             Some(TrayAction::SwitchAll { host_id }) => assert_eq!(host_id, "local"),
             _ => panic!("expected an every-display switch"),
+        }
+        // Group ids come from `next_nonce`, which uses hyphens; the separator
+        // here is a newline, so one cannot be read as the other.
+        match parse_action(&show_group_id("4821-1790000000-7")) {
+            Some(TrayAction::ShowGroup { group_id }) => assert_eq!(group_id, "4821-1790000000-7"),
+            _ => panic!("expected a group to be shown"),
+        }
+    }
+
+    #[test]
+    fn the_all_displays_item_carries_an_empty_group_id() {
+        match parse_action(&show_group_id("")) {
+            Some(TrayAction::ShowGroup { group_id }) => assert!(group_id.is_empty()),
+            _ => panic!("expected the every-display entry"),
         }
     }
 

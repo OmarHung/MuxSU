@@ -2,6 +2,7 @@ mod diagnostics;
 mod diagnostics_upload;
 mod host_alias;
 mod host_appearance;
+mod host_group;
 mod host_order;
 mod host_presence;
 mod input_label;
@@ -322,6 +323,12 @@ struct AppSettings {
     /// order and custom names, so it must never be re-derived: see
     /// `identifies_the_machine`. Backend-owned like `host_order`.
     local_host_id: String,
+    /// Groupings of shared displays and hosts, and the one the switch centre
+    /// is showing (see `host_group`). Kept on this computer and never shared
+    /// with paired hosts; changed only through the group commands.
+    host_groups: Vec<host_group::HostGroup>,
+    /// Which group is being shown, by id. Empty shows every display and host.
+    active_host_group: String,
     /// Whether the user allowed diagnostic reports to be sent without asking
     /// each time — after a failed switch — and paired hosts to be answered
     /// with this computer's snapshot. Changed only through
@@ -359,6 +366,8 @@ impl Default for AppSettings {
             local_host_id: String::new(),
             diagnostics_enabled: false,
             diagnostics_asked: false,
+            host_groups: Vec::new(),
+            active_host_group: String::new(),
         }
     }
 }
@@ -640,6 +649,12 @@ struct DashboardState {
     /// The name paired hosts discover this computer by, so its own card can
     /// default to it rather than to a generic "this Mac".
     local_host_name: String,
+    /// This computer's groups and the one being shown, so the switch centre
+    /// can offer them and show one arrangement at a time. Sent whole rather
+    /// than pre-filtered: the settings page edits the same list, and the
+    /// switch centre needs every display to offer a group that covers it.
+    host_groups: Vec<host_group::HostGroup>,
+    active_host_group_id: String,
 }
 
 /// One "these two identities are the same display" claim, as the settings page
@@ -996,6 +1011,33 @@ fn forget_peer(settings: &mut AppSettings, peer_id: &str) {
     settings
         .host_inputs
         .retain(|assignment| assignment.host_id != peer_id);
+    prune_host_groups(settings);
+}
+
+/// Drops displays and hosts this computer no longer has from every group, so
+/// a display that stopped being shared, or a host that was unpaired, does not
+/// sit in a group forever — invisible in the group editor, and counted by
+/// nothing that reads one.
+fn prune_host_groups(settings: &mut AppSettings) {
+    if settings.host_groups.is_empty() {
+        return;
+    }
+    let monitor_keys = settings
+        .shared_monitors
+        .iter()
+        .map(|selected| monitor_key(&selected.fingerprint))
+        .collect::<Vec<_>>();
+    let host_ids = settings
+        .peers
+        .iter()
+        .map(|peer| peer.id.clone())
+        .chain(std::iter::once(settings.local_host_id.clone()))
+        .collect::<Vec<_>>();
+    settings.host_groups = settings
+        .host_groups
+        .iter()
+        .map(|group| host_group::pruned_group(group, &monitor_keys, &host_ids))
+        .collect();
 }
 
 /// Runs blocking display work (enumeration, DDC/CI) off the main thread,
@@ -1120,6 +1162,7 @@ fn unshare_monitor(settings: &mut AppSettings, target: &MonitorFingerprint) {
                 .iter()
                 .any(|fingerprint| assignment.monitor.matches_exactly(fingerprint))
     });
+    prune_host_groups(settings);
 }
 
 #[tauri::command]
@@ -1153,9 +1196,17 @@ async fn get_host_switcher_state(app: AppHandle) -> Result<HostSwitcherState, St
 
 fn build_host_switcher_state(state: &AppRuntime, settings: &AppSettings) -> HostSwitcherState {
     let route_order = ordered_routes(state, settings);
+    // The active group narrows everything built from this: the host switcher
+    // window and the tray menu both read it. No active group shows all of it.
+    let group = host_group::active_group(&settings.host_groups, &settings.active_host_group);
+    let covers_monitor =
+        |key: &str| group.is_none_or(|group| host_group::includes_monitor(group, key));
+    let covers_host =
+        |host_id: &str| group.is_none_or(|group| host_group::includes_host(group, host_id));
     let monitors = settings
         .shared_monitors
         .iter()
+        .filter(|selected| covers_monitor(&monitor_key(&selected.fingerprint)))
         .map(|selected| {
             let mut hosts = Vec::with_capacity(settings.peers.len() + 1);
             let look = |host_id: &str| {
@@ -1164,46 +1215,57 @@ fn build_host_switcher_state(state: &AppRuntime, settings: &AppSettings) -> Host
                 (icon.map(str::to_owned), color.map(str::to_owned))
             };
             let (local_icon, local_color) = look(&state.local_host_id);
-            hosts.push(HostSwitcherOption {
-                id: "local".to_owned(),
-                // Falls back to the name paired hosts discover this computer
-                // by, so every surface calls it the same thing.
-                name: host_alias::alias_for(&settings.host_aliases, &state.local_host_id)
-                    .unwrap_or(if state.local_host_name.is_empty() {
-                        ui_text("這台電腦", "This computer")
-                    } else {
-                        state.local_host_name.as_str()
-                    })
-                    .to_owned(),
-                platform: settings.local_host,
-                input_name: selected
-                    .local_input
-                    .map(|input| noted_input_label(settings, selected, input)),
-                is_local: true,
-                available: selected.local_input.is_some(),
-                // Everywhere else an unset route means this computer: it is
-                // the state before the display has ever been switched away.
-                is_active: shows_this_host(selected),
-                icon: local_icon,
-                color: local_color,
-            });
-            hosts.extend(settings.peers.iter().map(|peer| {
-                let input = peer.input_for(&selected.fingerprint);
-                let (icon, color) = look(&peer.id);
-                HostSwitcherOption {
-                    id: peer.id.clone(),
-                    name: host_alias::alias_for(&settings.host_aliases, &peer.id)
-                        .unwrap_or(&peer.name)
+            // This computer is listed by its own discovery id in a group, but
+            // as "local" everywhere a route is named.
+            if covers_host(&state.local_host_id) {
+                hosts.push(HostSwitcherOption {
+                    id: "local".to_owned(),
+                    // Falls back to the name paired hosts discover this computer
+                    // by, so every surface calls it the same thing.
+                    name: host_alias::alias_for(&settings.host_aliases, &state.local_host_id)
+                        .unwrap_or(if state.local_host_name.is_empty() {
+                            ui_text("這台電腦", "This computer")
+                        } else {
+                            state.local_host_name.as_str()
+                        })
                         .to_owned(),
-                    platform: peer.platform,
-                    input_name: input.map(|input| noted_input_label(settings, selected, input)),
-                    is_local: false,
-                    available: input.is_some(),
-                    is_active: selected.active_route.as_deref() == Some(peer.id.as_str()),
-                    icon,
-                    color,
-                }
-            }));
+                    platform: settings.local_host,
+                    input_name: selected
+                        .local_input
+                        .map(|input| noted_input_label(settings, selected, input)),
+                    is_local: true,
+                    available: selected.local_input.is_some(),
+                    // Everywhere else an unset route means this computer: it is
+                    // the state before the display has ever been switched away.
+                    is_active: shows_this_host(selected),
+                    icon: local_icon,
+                    color: local_color,
+                });
+            }
+            hosts.extend(
+                settings
+                    .peers
+                    .iter()
+                    .filter(|peer| covers_host(&peer.id))
+                    .map(|peer| {
+                        let input = peer.input_for(&selected.fingerprint);
+                        let (icon, color) = look(&peer.id);
+                        HostSwitcherOption {
+                            id: peer.id.clone(),
+                            name: host_alias::alias_for(&settings.host_aliases, &peer.id)
+                                .unwrap_or(&peer.name)
+                                .to_owned(),
+                            platform: peer.platform,
+                            input_name: input
+                                .map(|input| noted_input_label(settings, selected, input)),
+                            is_local: false,
+                            available: input.is_some(),
+                            is_active: selected.active_route.as_deref() == Some(peer.id.as_str()),
+                            icon,
+                            color,
+                        }
+                    }),
+            );
             hosts.sort_by_key(|host| route_order.iter().position(|route| *route == host.id));
             HostSwitcherMonitor {
                 monitor_key: monitor_key(&selected.fingerprint),
@@ -1771,6 +1833,8 @@ fn build_dashboard_state(state: &AppRuntime, app: &AppHandle) -> Result<Dashboar
         merge_suggestions,
         resolved_monitor_identities,
         local_host_name: state.local_host_name.clone(),
+        host_groups: settings.host_groups.clone(),
+        active_host_group_id: host_group_state(&settings).active_group_id,
     })
 }
 
@@ -4148,6 +4212,145 @@ fn alias_error_text(error: host_alias::AliasError) -> String {
 }
 
 /// Frontend event telling windows to re-read custom host icons and colours.
+const HOST_GROUPS_CHANGED_EVENT: &str = "host-groups-changed";
+
+/// This computer's groups, and which one the switch centre is showing.
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HostGroupState {
+    groups: Vec<host_group::HostGroup>,
+    /// Empty when every display and host is shown — including when the saved
+    /// id names a group that has since been deleted.
+    active_group_id: String,
+}
+
+fn host_group_state(settings: &AppSettings) -> HostGroupState {
+    HostGroupState {
+        groups: settings.host_groups.clone(),
+        active_group_id: host_group::active_group(
+            &settings.host_groups,
+            &settings.active_host_group,
+        )
+        .map(|group| group.id.clone())
+        .unwrap_or_default(),
+    }
+}
+
+fn group_error_text(error: host_group::GroupError) -> String {
+    match error {
+        host_group::GroupError::EmptyName => {
+            ui_text("群組需要一個名稱", "A group needs a name").to_owned()
+        }
+        host_group::GroupError::NameTooLong => match UiLocale::current() {
+            UiLocale::TraditionalChinese => {
+                format!("群組名稱最多 {} 個字", host_group::MAX_GROUP_NAME_CHARS)
+            }
+            UiLocale::English => format!(
+                "Group names can be at most {} characters",
+                host_group::MAX_GROUP_NAME_CHARS
+            ),
+        },
+        host_group::GroupError::ControlCharacter => ui_text(
+            "群組名稱不能包含換行或控制字元",
+            "Group names cannot contain line breaks or control characters",
+        )
+        .to_owned(),
+        host_group::GroupError::TooManyGroups => match UiLocale::current() {
+            UiLocale::TraditionalChinese => {
+                format!("最多只能建立 {} 個群組", host_group::MAX_GROUPS)
+            }
+            UiLocale::English => {
+                format!("At most {} groups can be created", host_group::MAX_GROUPS)
+            }
+        },
+    }
+}
+
+/// Tells every window, and the tray menu, that the groups changed.
+fn publish_host_groups(app: &AppHandle) {
+    if let Err(error) = app.emit(HOST_GROUPS_CHANGED_EVENT, ()) {
+        tracing::warn!(error = %error, "unable to notify the windows of a group change");
+    }
+    tray::refresh_menu(app);
+}
+
+/// This computer's display and host groups.
+#[tauri::command]
+fn get_host_groups(state: State<'_, AppRuntime>) -> Result<HostGroupState, String> {
+    let settings = read_settings(&state)?;
+    Ok(host_group_state(&settings))
+}
+
+/// Adds a group, or replaces the one already holding its id. An empty id
+/// creates one. Returns every group as saved.
+#[tauri::command]
+fn save_host_group(
+    group: host_group::HostGroup,
+    state: State<'_, AppRuntime>,
+    app: AppHandle,
+) -> Result<HostGroupState, String> {
+    let mut settings = read_settings(&state)?;
+    let group = host_group::HostGroup {
+        id: if group.id.trim().is_empty() {
+            next_nonce()
+        } else {
+            group.id
+        },
+        ..group
+    };
+    settings.host_groups =
+        host_group::with_group(&settings.host_groups, group).map_err(group_error_text)?;
+    let settings = store_settings(&state, settings)?;
+    publish_host_groups(&app);
+    Ok(host_group_state(&settings))
+}
+
+/// Removes a group. Removing the one being shown goes back to showing
+/// everything, rather than leaving the switch centre on an arrangement that
+/// no longer exists.
+#[tauri::command]
+fn remove_host_group(
+    group_id: String,
+    state: State<'_, AppRuntime>,
+    app: AppHandle,
+) -> Result<HostGroupState, String> {
+    let mut settings = read_settings(&state)?;
+    settings.host_groups = host_group::without_group(&settings.host_groups, &group_id);
+    if settings.active_host_group == group_id {
+        settings.active_host_group = String::new();
+    }
+    let settings = store_settings(&state, settings)?;
+    publish_host_groups(&app);
+    Ok(host_group_state(&settings))
+}
+
+/// Shows one group in the switch centre, the tray menu and the host switcher.
+/// An id naming no group shows everything, which is how the choice is cleared.
+#[tauri::command]
+fn set_active_host_group(
+    group_id: String,
+    state: State<'_, AppRuntime>,
+    app: AppHandle,
+) -> Result<HostGroupState, String> {
+    apply_active_group(&state, &app, &group_id)
+}
+
+/// Shows one group everywhere. Shared with the tray menu, which offers the
+/// same choice without a window open.
+fn apply_active_group(
+    state: &AppRuntime,
+    app: &AppHandle,
+    group_id: &str,
+) -> Result<HostGroupState, String> {
+    let mut settings = read_settings(state)?;
+    settings.active_host_group = host_group::group_for(&settings.host_groups, group_id)
+        .map(|group| group.id.clone())
+        .unwrap_or_default();
+    let settings = store_settings(state, settings)?;
+    publish_host_groups(app);
+    Ok(host_group_state(&settings))
+}
+
 const HOST_APPEARANCES_CHANGED_EVENT: &str = "host-appearances-changed";
 
 /// A host's custom icon and colour as the frontend reads them; `None` keeps
@@ -5953,6 +6156,10 @@ fn migrate_single_monitor_settings(value: serde_json::Value) -> AppSettings {
         local_host_id: String::new(),
         diagnostics_enabled: false,
         diagnostics_asked: false,
+        // Groups are this computer's own and postdate every settings file
+        // these two migrations read, so an upgrade starts with none.
+        host_groups: Vec::new(),
+        active_host_group: String::new(),
     }
 }
 
@@ -6000,6 +6207,10 @@ fn migrate_legacy_settings(legacy: LegacySettings) -> AppSettings {
         local_host_id: String::new(),
         diagnostics_enabled: false,
         diagnostics_asked: false,
+        // Groups are this computer's own and postdate every settings file
+        // these two migrations read, so an upgrade starts with none.
+        host_groups: Vec::new(),
+        active_host_group: String::new(),
     }
 }
 
@@ -7367,6 +7578,10 @@ pub fn run() -> anyhow::Result<()> {
             set_host_name,
             get_host_appearances,
             set_host_appearance,
+            get_host_groups,
+            save_host_group,
+            remove_host_group,
+            set_active_host_group,
             set_input_label,
             set_monitor_identity_link,
             set_local_input,
@@ -7411,6 +7626,51 @@ mod tests {
             DestinationHost::Mac,
             None,
         )
+    }
+
+    #[test]
+    fn unpairing_a_host_takes_it_out_of_every_group() {
+        let mut settings = AppSettings {
+            local_host_id: "local-1".to_owned(),
+            peers: Vec::new(),
+            host_groups: vec![host_group::HostGroup {
+                id: "g1".to_owned(),
+                name: "書房".to_owned(),
+                monitor_keys: Vec::new(),
+                host_ids: vec!["local-1".to_owned(), "gone-peer".to_owned()],
+            }],
+            ..AppSettings::default()
+        };
+
+        prune_host_groups(&mut settings);
+
+        assert_eq!(
+            settings.host_groups[0].host_ids,
+            vec!["local-1".to_owned()],
+            "this computer stays; the unpaired host goes"
+        );
+    }
+
+    #[test]
+    fn a_group_survives_with_nothing_left_in_it_rather_than_being_deleted() {
+        // Emptying a group is not the same as the user deleting it: the name
+        // is theirs and the displays may come back.
+        let mut settings = AppSettings {
+            local_host_id: "local-1".to_owned(),
+            host_groups: vec![host_group::HostGroup {
+                id: "g1".to_owned(),
+                name: "書房".to_owned(),
+                monitor_keys: vec!["ACR:1234:gone".to_owned()],
+                host_ids: Vec::new(),
+            }],
+            ..AppSettings::default()
+        };
+
+        prune_host_groups(&mut settings);
+
+        assert_eq!(settings.host_groups.len(), 1);
+        assert!(settings.host_groups[0].monitor_keys.is_empty());
+        assert_eq!(settings.host_groups[0].name, "書房");
     }
 
     #[test]

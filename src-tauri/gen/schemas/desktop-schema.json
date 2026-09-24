@@ -399,6 +399,12 @@
           "markdownDescription": "Enables the get_host_appearances command without any pre-configured scope."
         },
         {
+          "description": "Enables the get_host_groups command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-get-host-groups",
+          "markdownDescription": "Enables the get_host_groups command without any pre-configured scope."
+        },
+        {
           "description": "Enables the get_host_names command without any pre-configured scope.",
           "type": "string",
           "const": "allow-get-host-names",
@@ -489,6 +495,12 @@
           "markdownDescription": "Enables the refresh_tray command without any pre-configured scope."
         },
         {
+          "description": "Enables the remove_host_group command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-remove-host-group",
+          "markdownDescription": "Enables the remove_host_group command without any pre-configured scope."
+        },
+        {
           "description": "Enables the remove_peer command without any pre-configured scope.",
           "type": "string",
           "const": "allow-remove-peer",
@@ -519,6 +531,12 @@
           "markdownDescription": "Enables the save_diagnostic_report command without any pre-configured scope."
         },
         {
+          "description": "Enables the save_host_group command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-save-host-group",
+          "markdownDescription": "Enables the save_host_group command without any pre-configured scope."
+        },
+        {
           "description": "Enables the save_settings command without any pre-configured scope.",
           "type": "string",
           "const": "allow-save-settings",
@@ -535,6 +553,12 @@
           "type": "string",
           "const": "allow-send-diagnostic-report",
           "markdownDescription": "Enables the send_diagnostic_report command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_active_host_group command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-active-host-group",
+          "markdownDescription": "Enables the set_active_host_group command without any pre-configured scope."
         },
         {
           "description": "Enables the set_diagnostics_consent command without any pre-configured scope.",
@@ -651,6 +675,12 @@
           "markdownDescription": "Denies the get_host_appearances command without any pre-configured scope."
         },
         {
+          "description": "Denies the get_host_groups command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-get-host-groups",
+          "markdownDescription": "Denies the get_host_groups command without any pre-configured scope."
+        },
+        {
           "description": "Denies the get_host_names command without any pre-configured scope.",
           "type": "string",
           "const": "deny-get-host-names",
@@ -741,6 +771,12 @@
           "markdownDescription": "Denies the refresh_tray command without any pre-configured scope."
         },
         {
+          "description": "Denies the remove_host_group command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-remove-host-group",
+          "markdownDescription": "Denies the remove_host_group command without any pre-configured scope."
+        },
+        {
           "description": "Denies the remove_peer command without any pre-configured scope.",
           "type": "string",
           "const": "deny-remove-peer",
@@ -771,6 +807,12 @@
           "markdownDescription": "Denies the save_diagnostic_report command without any pre-configured scope."
         },
         {
+          "description": "Denies the save_host_group command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-save-host-group",
+          "markdownDescription": "Denies the save_host_group command without any pre-configured scope."
+        },
+        {
           "description": "Denies the save_settings command without any pre-configured scope.",
           "type": "string",
           "const": "deny-save-settings",
@@ -787,6 +829,12 @@
           "type": "string",
           "const": "deny-send-diagnostic-report",
           "markdownDescription": "Denies the send_diagnostic_report command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_active_host_group command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-active-host-group",
+          "markdownDescription": "Denies the set_active_host_group command without any pre-configured scope."
         },
         {
           "description": "Denies the set_diagnostics_consent command without any pre-configured scope.",
