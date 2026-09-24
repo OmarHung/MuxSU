@@ -16,7 +16,7 @@ const en = {
   "toast.groupShowFailed": "Could not show that group",
   "settingsTab.groupsBody": "Work with a few of your displays and computers at a time instead of all of them.",
   "settings.groupsTitle": "Groups",
-  "settings.groupsHint": "A group is the displays and computers you use together. Showing one narrows the switch centre, the host switcher and the tray menu to it. Groups stay on this computer and are not shared with paired hosts.",
+  "settings.groupsHint": "Showing a group narrows the switch centre, the host switcher and the tray menu to the displays and computers it covers. Groups stay on this computer.",
   "settings.groupsEmpty": "No groups yet. Create one to switch between arrangements.",
   "settings.groupDisplays": "Displays",
   "settings.groupHosts": "Computers",

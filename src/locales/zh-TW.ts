@@ -12,7 +12,7 @@ const zhTW: Record<keyof typeof en, string> = {
   "toast.groupShowFailed": "無法顯示那個群組",
   "settingsTab.groupsBody": "一次只處理其中幾台螢幕與電腦，而不是全部。",
   "settings.groupsTitle": "群組",
-  "settings.groupsHint": "群組就是你會一起使用的螢幕與電腦。選了某個群組，切換中心、主機切換器與系統匣選單都只會顯示它涵蓋的範圍。群組只存在這台電腦，不會同步給已配對的主機。",
+  "settings.groupsHint": "選了群組之後，切換中心、主機切換器與系統匣都只顯示它涵蓋的螢幕與電腦。群組只存在這台電腦。",
   "settings.groupsEmpty": "還沒有群組。建立一個，就能在不同組合之間切換。",
   "settings.groupDisplays": "螢幕",
   "settings.groupHosts": "電腦",

@@ -1427,6 +1427,11 @@ fn settings_from_form(submitted: AppSettings, protected: &AppSettings) -> AppSet
         local_host_id: protected.local_host_id.clone(),
         diagnostics_enabled: protected.diagnostics_enabled,
         diagnostics_asked: protected.diagnostics_asked,
+        // The form knows nothing about groups, so leaving these to the
+        // submitted copy would clear every group — and the one being shown —
+        // the first time anything else on the page was saved.
+        host_groups: protected.host_groups.clone(),
+        active_host_group: protected.active_host_group.clone(),
         ..settings_for_current_build(submitted)
     }
 }
@@ -7675,6 +7680,32 @@ mod tests {
             DestinationHost::Mac,
             None,
         )
+    }
+
+    #[test]
+    fn saving_the_settings_form_leaves_the_groups_alone() {
+        // The form has no group fields, so what it submits for them is empty.
+        // Taking that at face value cleared every group and the one on screen.
+        let saved = AppSettings {
+            host_groups: vec![host_group::HostGroup {
+                id: "g1".to_owned(),
+                name: "屏東".to_owned(),
+                monitor_keys: vec!["ACR:1234:serial-a".to_owned()],
+                host_ids: Vec::new(),
+            }],
+            active_host_group: "g1".to_owned(),
+            ..AppSettings::default()
+        };
+        let submitted = AppSettings {
+            wait_seconds: 30,
+            ..AppSettings::default()
+        };
+
+        let merged = settings_from_form(submitted, &saved);
+
+        assert_eq!(merged.host_groups, saved.host_groups);
+        assert_eq!(merged.active_host_group, "g1", "the choice survives a save");
+        assert_eq!(merged.wait_seconds, 30, "the form's own fields still apply");
     }
 
     #[test]
