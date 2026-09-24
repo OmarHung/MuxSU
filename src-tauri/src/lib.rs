@@ -456,7 +456,10 @@ struct AppRuntime {
     settings: Arc<RwLock<AppSettings>>,
     settings_path: PathBuf,
     agent_task: Mutex<Option<tauri::async_runtime::JoinHandle<()>>>,
-    discovery: Option<MdnsPeerDiscovery>,
+    /// Filled in once mDNS has started, which is after this runtime is
+    /// managed: starting it first delayed `manage` long enough for the first
+    /// command from the webview to find no state and abort the process.
+    discovery: OnceLock<MdnsPeerDiscovery>,
     /// This computer's discovery id, used to name it in the shared host order.
     local_host_id: String,
     /// The machine name paired hosts discover this computer by. Used as the
@@ -895,7 +898,7 @@ enum UpdateDownloadEvent {
 #[tauri::command]
 async fn discover_peers(state: State<'_, AppRuntime>) -> Result<Vec<DiscoveredPeer>, String> {
     sleep(Duration::from_millis(700)).await;
-    let discovery = state.discovery.as_ref().ok_or_else(|| {
+    let discovery = state.discovery.get().ok_or_else(|| {
         ui_text(
             "無法啟動區域網路搜尋；請確認防火牆允許 MuxSU 使用私人網路",
             "Unable to start local network discovery. Allow MuxSU through the firewall on private networks.",
@@ -913,7 +916,7 @@ async fn select_peer(
     shared_key: Option<String>,
     state: State<'_, AppRuntime>,
 ) -> Result<AppSettings, String> {
-    let discovery = state.discovery.as_ref().ok_or_else(|| {
+    let discovery = state.discovery.get().ok_or_else(|| {
         ui_text(
             "區域網路搜尋目前不可用",
             "Local network discovery is unavailable",
@@ -4107,7 +4110,7 @@ fn set_host_name(
         // advertises, so a rename that stops here is invisible to them.
         let advertised = host_alias::alias_for(&settings.host_aliases, &host_id)
             .unwrap_or(state.local_host_name.as_str());
-        if let Some(discovery) = state.discovery.as_ref() {
+        if let Some(discovery) = state.discovery.get() {
             if let Err(error) = discovery.advertise_name(advertised) {
                 tracing::warn!(error = %error, "unable to advertise this computer's new name");
             }
@@ -5555,7 +5558,7 @@ fn adopt_peer_routes_at_startup(app: &AppHandle) {
         // discovery knows are worth a second try before giving up on it.
         let discovered = runtime
             .discovery
-            .as_ref()
+            .get()
             .and_then(|discovery| discovery.peers().ok())
             .unwrap_or_default();
         let settings = Arc::new(settings);
@@ -6705,6 +6708,29 @@ fn settings_for_current_build(settings: AppSettings) -> AppSettings {
     settings
 }
 
+/// What this computer advertises itself as: the name its user gave it when
+/// there is one, and the machine name otherwise — the same rule
+/// `set_host_name` applies when a rename happens.
+///
+/// A rename used to reach the advertised record only at the moment it was
+/// made. Starting up again advertised the machine name once more, and a host
+/// that has not paired with this one has nothing but that record to list it
+/// by, so it showed a name its user had already replaced.
+fn advertised_identity(
+    identity: &LocalHostIdentity,
+    aliases: &[muxsu_core::HostAlias],
+) -> LocalHostIdentity {
+    match host_alias::alias_for(aliases, &identity.id) {
+        Some(alias) => LocalHostIdentity::with_id(
+            identity.id.clone(),
+            alias.to_owned(),
+            identity.platform,
+            identity.mac_address.clone(),
+        ),
+        None => identity.clone(),
+    }
+}
+
 fn autostart_args() -> Option<Vec<&'static str>> {
     #[cfg(target_os = "windows")]
     {
@@ -7094,6 +7120,10 @@ fn save_diagnostic_report(report_id: String, app: AppHandle) -> Result<String, S
 }
 
 pub fn run() -> anyhow::Result<()> {
+    // Ahead of the builder, because every plugin below initialises before
+    // `setup` starts the log file, and a panic in that window left nothing
+    // behind at all.
+    diagnostics::install_panic_logger();
     let builder = tauri::Builder::default()
         // This must remain the first plugin so a second launch exits before any
         // other plugin or application setup can create duplicate resources.
@@ -7146,16 +7176,6 @@ pub fn run() -> anyhow::Result<()> {
                 .map_err(|error| anyhow::anyhow!(error))?;
             let settings_path = config_dir.join("settings.json");
             let settings = settings_for_current_build(load_settings(&settings_path));
-            #[cfg(debug_assertions)]
-            if let Err(error) = app.autolaunch().disable() {
-                tracing::warn!(error = %error, "unable to remove development autostart entry");
-            }
-            #[cfg(all(target_os = "windows", not(debug_assertions)))]
-            if settings.autostart {
-                if let Err(error) = app.autolaunch().enable() {
-                    tracing::warn!(error = %error, "unable to refresh the login autostart entry");
-                }
-            }
             let detected = LocalHostIdentity::detect(local_host()).unwrap_or_else(|error| {
                 tracing::warn!(error = %error, "unable to read this computer's host name");
                 LocalHostIdentity::from_parts("MuxSU".to_owned(), local_host(), None)
@@ -7164,12 +7184,10 @@ pub fn run() -> anyhow::Result<()> {
             // re-deriving it would silently strand this computer's pairings,
             // its place in the shared host order and its custom name.
             let mut settings = settings;
-            let identity = if settings.local_host_id.is_empty() {
+            let first_run = settings.local_host_id.is_empty();
+            let identity = if first_run {
                 settings.local_host_id = detected.id.clone();
                 ensure_host_input_history(&mut settings);
-                if let Err(error) = persist_settings(&settings_path, &settings) {
-                    tracing::warn!(error = %error, "unable to save this computer's host id");
-                }
                 detected
             } else {
                 LocalHostIdentity::with_id(
@@ -7179,17 +7197,17 @@ pub fn run() -> anyhow::Result<()> {
                     detected.mac_address,
                 )
             };
-            let discovery = MdnsPeerDiscovery::start(&identity, DEFAULT_AGENT_PORT)
-                .map(Some)
-                .unwrap_or_else(|error| {
-                    tracing::warn!(error = %error, "unable to start MuxSU mDNS discovery");
-                    None
-                });
+            // Saved after `manage` below, along with everything else that
+            // touches the disk, the registry or the network.
+            let new_identity_to_save = first_run.then(|| settings.clone());
+            #[cfg(all(target_os = "windows", not(debug_assertions)))]
+            let autostart_wanted = settings.autostart;
+            let discovery_identity = advertised_identity(&identity, &settings.host_aliases);
             app.manage(AppRuntime {
                 settings: Arc::new(RwLock::new(settings)),
-                settings_path,
+                settings_path: settings_path.clone(),
                 agent_task: Mutex::new(None),
-                discovery,
+                discovery: OnceLock::new(),
                 local_host_id: identity.id,
                 local_host_name: identity.name,
                 local_mac_address: identity.mac_address,
@@ -7205,6 +7223,45 @@ pub fn run() -> anyhow::Result<()> {
                     std::collections::HashSet::new(),
                 )),
             });
+            // Tauri builds every window in its config before it calls this
+            // hook, and a webview that is up starts calling commands at once.
+            // So the first command used to arrive before this hook had run at
+            // all — before the log file, before `manage` — and reading
+            // `State<AppRuntime>` panicked. With `panic = "abort"` that ended
+            // the process: on Windows, a window that opened and vanished a few
+            // seconds later, every time, leaving nothing in any log to say
+            // why. Each window carries `create: false` so Tauri leaves it
+            // alone, and they are built here instead, after `manage` above.
+            for window in app.config().app.windows.clone() {
+                tauri::WebviewWindowBuilder::from_config(app.handle(), &window)?.build()?;
+            }
+            // Past this point the state a command needs exists and the windows
+            // that call them are up, so the work below is free to be slow.
+            if let Some(settings) = new_identity_to_save {
+                if let Err(error) = persist_settings(&settings_path, &settings) {
+                    tracing::warn!(error = %error, "unable to save this computer's host id");
+                }
+            }
+            #[cfg(debug_assertions)]
+            if let Err(error) = app.autolaunch().disable() {
+                tracing::warn!(error = %error, "unable to remove development autostart entry");
+            }
+            #[cfg(all(target_os = "windows", not(debug_assertions)))]
+            if autostart_wanted {
+                if let Err(error) = app.autolaunch().enable() {
+                    tracing::warn!(error = %error, "unable to refresh the login autostart entry");
+                }
+            }
+            match MdnsPeerDiscovery::start(&discovery_identity, DEFAULT_AGENT_PORT) {
+                Ok(discovery) => {
+                    if app.state::<AppRuntime>().discovery.set(discovery).is_err() {
+                        tracing::warn!("MuxSU mDNS discovery had already been started");
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(error = %error, "unable to start MuxSU mDNS discovery");
+                }
+            }
             if let Some(runtime) = app.try_state::<AppRuntime>() {
                 let mut settings = read_settings_inner(&runtime).map_err(anyhow::Error::msg)?;
                 if settings.host_switcher_enabled {
@@ -7346,6 +7403,55 @@ mod tests {
     use std::collections::HashSet;
 
     use super::*;
+
+    fn local_identity() -> LocalHostIdentity {
+        LocalHostIdentity::with_id(
+            "host-1".to_owned(),
+            "Omars-MacBook-Pro-M4-Pro.local".to_owned(),
+            DestinationHost::Mac,
+            None,
+        )
+    }
+
+    #[test]
+    fn a_renamed_computer_still_advertises_that_name_after_a_restart() {
+        let identity = local_identity();
+        let aliases = vec![muxsu_core::HostAlias {
+            host_id: "host-1".to_owned(),
+            name: "Omar 的 MacBook".to_owned(),
+            updated_at_ms: 1,
+        }];
+
+        let advertised = advertised_identity(&identity, &aliases);
+
+        assert_eq!(advertised.name, "Omar 的 MacBook");
+        assert_eq!(advertised.id, identity.id);
+    }
+
+    #[test]
+    fn a_computer_that_was_never_renamed_advertises_its_machine_name() {
+        let identity = local_identity();
+
+        let advertised = advertised_identity(&identity, &[]);
+
+        assert_eq!(advertised.name, "Omars-MacBook-Pro-M4-Pro.local");
+    }
+
+    #[test]
+    fn a_cleared_name_falls_back_to_the_machine_name() {
+        let identity = local_identity();
+        // An empty alias records a name the user cleared, so it must not be
+        // advertised as this computer's name.
+        let aliases = vec![muxsu_core::HostAlias {
+            host_id: "host-1".to_owned(),
+            name: String::new(),
+            updated_at_ms: 2,
+        }];
+
+        let advertised = advertised_identity(&identity, &aliases);
+
+        assert_eq!(advertised.name, "Omars-MacBook-Pro-M4-Pro.local");
+    }
 
     #[test]
     fn update_install_error_keeps_the_download_status() {
