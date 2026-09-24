@@ -430,3 +430,28 @@ button.matrix-cell:hover:not(:disabled) small { color: var(--c); }
 }
 .source-key.is-unconfirmed { cursor: help; }
 .source-key.is-unconfirmed .source-action { color: var(--warn); }
+
+/* The group chips above the switch panel: which arrangement is on screen.
+   Sized like .view-toggle next to it; the active one takes the accent because
+   it says the panel below is filtered, not merely which view is drawn. */
+.group-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-bottom: 14px;
+  padding: 3px;
+  border-radius: 999px;
+}
+.group-chip {
+  padding: 5px 13px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.group-chip:hover { color: var(--text); }
+.group-chip.is-active { color: var(--accent-text); background: var(--accent); }

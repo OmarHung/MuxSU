@@ -1,6 +1,6 @@
 import {
   Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, createIcons, Download, ExternalLink, FlaskConical, Github, Info,
-  GripVertical, KeyRound, Keyboard, Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap,
+  GripVertical, KeyRound, Keyboard, Languages, Layers, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap,
   Plus, RefreshCw, RotateCcw, Save, Search, SunMoon, Trash2, TriangleAlert, UserRound, Zap,
 } from "lucide";
 import { getVersion } from "@tauri-apps/api/app";
@@ -141,6 +141,22 @@ interface DashboardState {
   mergeSuggestions?: MergeSuggestion[];
   resolvedMonitorIdentities: Record<string, string>;
   localHostName?: string;
+  hostGroups?: HostGroup[];
+  activeHostGroupId?: string;
+}
+
+/** A set of displays and computers used together, kept on this computer.
+ *  An empty `monitorKeys` or `hostIds` covers all of that half. */
+interface HostGroup {
+  id: string;
+  name: string;
+  monitorKeys: string[];
+  hostIds: string[];
+}
+
+interface HostGroupState {
+  groups: HostGroup[];
+  activeGroupId: string;
 }
 
 /** What the backend's last check said about one paired host. */
@@ -219,6 +235,8 @@ let isPreview = false;
 let pendingUpdate: UpdateInfo | null = null;
 let isRecordingShortcut = false;
 let shortcutStatus: { kind: "checking" | "available" | "conflict"; text: string } | null = null;
+/** The group open in the editor. A new one has an empty id; null is closed. */
+let editingGroup: HostGroup | null = null;
 
 const releaseHistoryFallback = [
   { date: "2026-09-22", version: "v0.8.1", url: "https://github.com/OmarHung/MuxSU/releases/tag/v0.8.1" },
@@ -309,7 +327,7 @@ app.innerHTML = appShellHtml({ releaseRows: releaseHistoryRows(releaseHistoryFal
 
 const iconSet = {
   Activity, AlertCircle, ChevronDown, ChevronUp, CircleHelp, Download, ExternalLink, FlaskConical, Github, GripVertical, Info, KeyRound, Keyboard,
-  Languages, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap, Plus, RefreshCw, Save, Search,
+  Languages, Layers, LayoutGrid, Link, Monitor, MonitorDot, MonitorOff, Network, Pencil, PlugZap, Plus, RefreshCw, Save, Search,
   SunMoon, RotateCcw, Trash2, TriangleAlert, UserRound, Zap, ...hostIconSet,
 };
 const refreshIcons = () => createIcons({ icons: iconSet });
@@ -345,6 +363,57 @@ document.querySelector<HTMLButtonElement>('[data-page="settings"]')?.addEventLis
 window.addEventListener("resize", () => positionOnboardingTooltip());
 document.querySelector(".workspace")?.addEventListener("scroll", () => positionOnboardingTooltip());
 document.querySelector<HTMLButtonElement>("#scan-button")?.addEventListener("click", () => void scanPeers());
+document.querySelector<HTMLButtonElement>("#new-group-button")?.addEventListener("click", () => {
+  editingGroup = { id: "", name: "", monitorKeys: [], hostIds: [] };
+  renderGroupList();
+  refreshIcons();
+});
+document.addEventListener("click", (event) => {
+  const target = event.target as HTMLElement;
+  const chip = target.closest<HTMLButtonElement>("#group-bar [data-group-id]");
+  if (chip) {
+    void showGroup(chip.dataset.groupId ?? "");
+    return;
+  }
+  const edit = target.closest<HTMLButtonElement>("[data-edit-group]");
+  if (edit) {
+    const id = edit.dataset.editGroup ?? "";
+    editingGroup = hostGroups().find((group) => group.id === id) ?? null;
+    renderGroupList();
+    refreshIcons();
+    return;
+  }
+  const remove = target.closest<HTMLButtonElement>("[data-delete-group]");
+  if (remove) {
+    void removeGroup(remove.dataset.deleteGroup ?? "");
+    return;
+  }
+  if (target.closest("#save-group-button")) {
+    void saveEditingGroup();
+    return;
+  }
+  if (target.closest("#cancel-group-button")) {
+    editingGroup = null;
+    renderGroupList();
+    refreshIcons();
+  }
+});
+document.addEventListener("change", (event) => {
+  if (!editingGroup) return;
+  const box = (event.target as HTMLElement).closest<HTMLInputElement>("[data-group-display], [data-group-host]");
+  if (!box) return;
+  const isDisplay = box.dataset.groupDisplay != null;
+  const value = (isDisplay ? box.dataset.groupDisplay : box.dataset.groupHost) ?? "";
+  const current = isDisplay ? editingGroup.monitorKeys : editingGroup.hostIds;
+  const updated = box.checked ? [...current, value] : current.filter((saved) => saved !== value);
+  editingGroup = isDisplay
+    ? { ...editingGroup, monitorKeys: updated }
+    : { ...editingGroup, hostIds: updated };
+});
+document.addEventListener("input", (event) => {
+  const field = (event.target as HTMLElement).closest<HTMLInputElement>("#group-name-input");
+  if (field && editingGroup) editingGroup = { ...editingGroup, name: field.value };
+});
 document.addEventListener("click", (event) => {
   const link = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[data-external-url]");
   if (!link) return;
@@ -632,7 +701,7 @@ function currentSwitchView(): SwitchView {
   const stored = storedSwitchView();
   if (stored) return stored;
   const hostCount = settings.peers.length + 1;
-  return dashboard.shared.length >= MATRIX_MIN_DISPLAYS || hostCount >= MATRIX_MIN_HOSTS ? "matrix" : "stage";
+  return groupedShared().length >= MATRIX_MIN_DISPLAYS || hostCount >= MATRIX_MIN_HOSTS ? "matrix" : "stage";
 }
 
 function setSwitchView(view: SwitchView): void {
@@ -924,12 +993,13 @@ function startPresenceChecks(): void {
  *  sleeping host can be woken. Also the counts beside the settings tabs. */
 function renderSummary(): void {
   const hostCount = settings.peers.length + 1;
-  const parts = [t("dashboard.summary", { displays: dashboard.shared.length, hosts: hostCount })];
+  const shown = groupedShared();
+  const parts = [t("dashboard.summary", { displays: shown.length, hosts: switchRoutes().length || hostCount })];
   if (settings.peers.length) {
     const wake = settings.peers.some((peer) => peer.macAddress) ? t("dashboard.wakeNormal") : t("dashboard.noMac");
     parts.push(`${t("dashboard.wakeLabel")}${locale === "en" ? " " : ""}${wake}`);
   }
-  setText("#dashboard-summary", dashboard.shared.length ? parts.join(" · ") : t("dashboard.notSelected"));
+  setText("#dashboard-summary", shown.length ? parts.join(" · ") : t("dashboard.notSelected"));
   setText("#count-displays", dashboard.shared.length ? String(dashboard.shared.length) : "");
   setText("#count-hosts", settings.peers.length ? String(settings.peers.length) : "");
 }
@@ -1022,8 +1092,178 @@ function switchRoutes(): SwitchRoute[] {
       id, name: routeDisplayName(id), platform, local: id === "local",
       icon: look.lucide, color: look.color, customIcon: look.customIcon, customColor: look.customColor,
     };
-  });
+    // Filtered after the map so a host keeps the colour and icon it has in the
+    // full order, rather than taking another host's when a group hides it.
+  }).filter((route) => groupCoversRoute(route.id));
 }
+
+/** The groups this computer has, as the last dashboard read gave them. */
+function hostGroups(): HostGroup[] {
+  return dashboard.hostGroups ?? [];
+}
+
+/** The group being shown, or null when everything is. */
+function activeGroup(): HostGroup | null {
+  const id = dashboard.activeHostGroupId ?? "";
+  return hostGroups().find((group) => group.id === id) ?? null;
+}
+
+/** The shared displays the active group covers. Listing none covers all. */
+function groupedShared(): SharedMonitorStatus[] {
+  const group = activeGroup();
+  if (!group?.monitorKeys.length) return dashboard.shared;
+  return dashboard.shared.filter((shared) => group.monitorKeys.includes(shared.monitorKey));
+}
+
+/** Whether the active group covers a route. Listing no hosts covers all. */
+function groupCoversRoute(routeId: string): boolean {
+  const group = activeGroup();
+  return !group?.hostIds.length || group.hostIds.includes(routeId);
+}
+
+/** Emitted by the backend when a group changes here or in the tray menu. */
+const HOST_GROUPS_CHANGED_EVENT = "host-groups-changed";
+
+/** Re-reads the groups after the tray menu, or another window, changed them. */
+async function reloadGroups(): Promise<void> {
+  if (isPreview) return;
+  try {
+    applyGroupState(await invoke<HostGroupState>("get_host_groups"));
+  } catch (error) {
+    // The next dashboard read carries the groups too, so this is not worth a
+    // toast on top of whatever already failed.
+    console.warn("unable to re-read the groups", error);
+  }
+}
+
+/** Takes the backend's word for the groups without a full dashboard read. */
+function applyGroupState(state: HostGroupState): void {
+  dashboard = { ...dashboard, hostGroups: state.groups, activeHostGroupId: state.activeGroupId };
+  renderGroupBar();
+  renderGroupList();
+  renderSwitchPanel();
+  refreshIcons();
+}
+
+/** Shows one group, or everything when `groupId` is empty. */
+async function showGroup(groupId: string): Promise<void> {
+  if (isPreview) return;
+  try {
+    applyGroupState(await invoke<HostGroupState>("set_active_host_group", { groupId }));
+  } catch (error) {
+    showToast(t("toast.groupShowFailed"), String(error), true);
+  }
+}
+
+/** Saves the group in the editor. The backend names an empty one and refuses
+ *  a name it cannot show, so both messages come from there. */
+async function saveEditingGroup(): Promise<void> {
+  if (!editingGroup || isPreview) return;
+  try {
+    const state = await invoke<HostGroupState>("save_host_group", { group: editingGroup });
+    editingGroup = null;
+    applyGroupState(state);
+  } catch (error) {
+    showToast(t("toast.groupFailed"), String(error), true);
+  }
+}
+
+async function removeGroup(groupId: string): Promise<void> {
+  if (isPreview) return;
+  try {
+    if (editingGroup?.id === groupId) editingGroup = null;
+    applyGroupState(await invoke<HostGroupState>("remove_host_group", { groupId }));
+  } catch (error) {
+    showToast(t("toast.groupFailed"), String(error), true);
+  }
+}
+
+/** The group chips above the switch panel. Hidden until a group exists. */
+function renderGroupBar(): void {
+  const bar = document.querySelector<HTMLElement>("#group-bar");
+  if (!bar) return;
+  const groups = hostGroups();
+  bar.hidden = groups.length === 0;
+  if (!groups.length) {
+    bar.innerHTML = "";
+    return;
+  }
+  const activeId = activeGroup()?.id ?? "";
+  const chip = (id: string, name: string) => {
+    const isActive = id === activeId;
+    return `<button type="button" class="group-chip ${isActive ? "is-active" : ""}" data-group-id="${escapeHtml(id)}" aria-pressed="${isActive}">${escapeHtml(name)}</button>`;
+  };
+  bar.innerHTML = chip("", t("group.all")) + groups.map((group) => chip(group.id, group.name)).join("");
+}
+
+/** The display name of a shared display, by its key. */
+function sharedDisplayName(monitorKey: string): string {
+  return dashboard.shared.find((shared) => shared.monitorKey === monitorKey)?.name ?? monitorKey;
+}
+
+/** What a group covers, for the row that is not being edited. */
+function groupCoverageText(group: HostGroup): string {
+  const displays = group.monitorKeys.length
+    ? group.monitorKeys.map(sharedDisplayName).join("、")
+    : t("settings.groupCoversAllDisplays");
+  const hosts = group.hostIds.length
+    ? group.hostIds.map(routeDisplayName).join("、")
+    : t("settings.groupCoversAllHosts");
+  return `${displays} · ${hosts}`;
+}
+
+function groupCheckbox(kind: "display" | "host", value: string, label: string, checked: boolean): string {
+  return `<label class="group-pick"><input type="checkbox" data-group-${kind}="${escapeHtml(value)}" ${checked ? "checked" : ""} /><span>${escapeHtml(label)}</span></label>`;
+}
+
+/** The editor for a new or existing group. */
+function groupEditorHtml(group: HostGroup): string {
+  const displays = dashboard.shared
+    .map((shared) => groupCheckbox("display", shared.monitorKey, shared.name, group.monitorKeys.includes(shared.monitorKey)))
+    .join("");
+  const hosts = currentRouteIds()
+    .map((id) => groupCheckbox("host", id, routeDisplayName(id), group.hostIds.includes(id)))
+    .join("");
+  return `<div class="group-editor" data-group-editor>
+    <label class="row field-row">
+      <span><span class="row-title">${t("settings.groupsTitle")}</span></span>
+      <span class="input-wrap"><i data-lucide="layers"></i><input class="field-input" id="group-name-input" type="text" maxlength="32" value="${escapeHtml(group.name)}" placeholder="${t("settings.groupNamePlaceholder")}" /></span>
+    </label>
+    <fieldset class="group-picks"><legend>${t("settings.groupDisplays")}</legend>${displays}</fieldset>
+    <fieldset class="group-picks"><legend>${t("settings.groupHosts")}</legend>${hosts}</fieldset>
+    <p class="section-hint">${t("group.nothingSelectedHint")}</p>
+    <div class="group-editor-actions">
+      <button class="button small" type="button" id="cancel-group-button">${t("action.cancelGroup")}</button>
+      <button class="button small primary" type="button" id="save-group-button"><i data-lucide="save"></i><span>${t("action.saveGroup")}</span></button>
+    </div>
+  </div>`;
+}
+
+/** The group list in settings, with the editor inline on the row being edited. */
+function renderGroupList(): void {
+  const list = document.querySelector<HTMLElement>("#group-list");
+  if (!list) return;
+  // A redraw while someone is typing in the editor would take the caret with
+  // it. The state behind it is already current, so there is nothing to redraw.
+  if (editingGroup && list.contains(document.activeElement)) return;
+  const groups = hostGroups();
+  setText("#count-groups", groups.length ? String(groups.length) : "");
+  const rows = groups.map((group) => {
+    if (editingGroup && editingGroup.id === group.id) return groupEditorHtml(editingGroup);
+    return `<div class="row group-row">
+      <span><span class="row-title">${escapeHtml(group.name)}</span><span class="row-hint">${escapeHtml(groupCoverageText(group))}</span></span>
+      <span class="row-actions">
+        <button class="icon-button" type="button" data-edit-group="${escapeHtml(group.id)}" title="${t("action.editGroup")}" aria-label="${t("action.editGroup")}"><i data-lucide="pencil"></i></button>
+        <button class="icon-button is-danger" type="button" data-delete-group="${escapeHtml(group.id)}" title="${t("action.deleteGroup")}" aria-label="${t("action.deleteGroup")}"><i data-lucide="trash-2"></i></button>
+      </span>
+    </div>`;
+  });
+  const creating = editingGroup && !editingGroup.id ? groupEditorHtml(editingGroup) : "";
+  list.innerHTML = groups.length || creating
+    ? rows.join("") + creating
+    : `<p class="empty-hint">${t("settings.groupsEmpty")}</p>`;
+}
+
 
 function routeColor(routeId: string): string {
   return hostLook(hostAppearances[routeId], routePlatform(routeId), currentRouteIds().indexOf(routeId)).color;
@@ -1183,7 +1423,7 @@ function renderSwitchPanel(): void {
   const container = document.querySelector<HTMLElement>("#switch-panel");
   if (!container) return;
   const toggle = document.querySelector<HTMLElement>("#view-toggle");
-  if (!dashboard.shared.length) {
+  if (!groupedShared().length) {
     if (toggle) toggle.hidden = true;
     container.innerHTML = emptySwitchPanelHtml();
     return;
@@ -1204,8 +1444,9 @@ function renderSwitchPanel(): void {
     container.querySelector<HTMLElement>(".matrix")?.style.setProperty("--hosts", String(routes.length));
     return;
   }
-  container.innerHTML = `<div class="stage ${dashboard.shared.length === 1 ? "is-single" : ""}">
-    ${dashboard.shared.map((shared) => stagePanelHtml(shared, routes)).join("")}
+  const shown = groupedShared();
+  container.innerHTML = `<div class="stage ${shown.length === 1 ? "is-single" : ""}">
+    ${shown.map((shared) => stagePanelHtml(shared, routes)).join("")}
   </div>`;
 }
 
@@ -1291,8 +1532,8 @@ function sourceKeyHtml(shared: SharedMonitorStatus, route: SwitchRoute, isActive
 function matrixHtml(routes: SwitchRoute[]): string {
   const heads = routes.map((route) => {
     const name = escapeHtml(route.name);
-    const isAllOnThisHost = dashboard.shared.every((shared) => activeRouteFor(shared) === route.id);
-    const allUnconfirmed = isAllOnThisHost && dashboard.shared.some(activeRouteUnconfirmed);
+    const isAllOnThisHost = groupedShared().every((shared) => activeRouteFor(shared) === route.id);
+    const allUnconfirmed = isAllOnThisHost && groupedShared().some(activeRouteUnconfirmed);
     const allButton = isAllOnThisHost
       ? `<span class="switch-all-host ${allUnconfirmed ? "is-unconfirmed" : "tint is-showing"}">${allUnconfirmed ? t("dashboard.lastShown") : t("dashboard.allDisplayed")}</span>`
       : `<button type="button" class="switch-all-host glass" data-switch-all-id="${escapeHtml(route.id)}" aria-label="${escapeHtml(t("action.switchAllToHost", { name: route.name }))}" ${switchAllTargets(route.id).length ? "" : "disabled"}>${t("switcher.switchAll")}</button>`;
@@ -1306,7 +1547,7 @@ function matrixHtml(routes: SwitchRoute[]): string {
       ${allButton}
     </div>`;
   }).join("");
-  const rows = dashboard.shared.map((shared) => {
+  const rows = groupedShared().map((shared) => {
     const { resolution } = resolutionFor(shared);
     const isUltrawide = Boolean(resolution && isUltrawideResolution(resolution));
     const activeId = activeRouteFor(shared);
@@ -1378,6 +1619,8 @@ function renderState(): void {
   const hostSwitcherEnabled = document.querySelector<HTMLInputElement>("#host-switcher-enabled");
   if (hostSwitcherEnabled) hostSwitcherEnabled.checked = settings.hostSwitcherEnabled;
   renderShortcutSetting();
+  renderGroupBar();
+  renderGroupList();
   renderSwitchPanel();
   diagnostics.render();
   renderMonitors(); renderMonitorMerge(); renderPeerList(); renderHostList(); renderLocalInputSummary(); renderInputLabels(); refreshIcons();
@@ -2107,7 +2350,7 @@ function routeDisplayName(routeId: string): string {
 function renderSwitchAllBar(): void {
   const container = document.querySelector<HTMLElement>("#switch-all-bar");
   if (!container) return;
-  const isShown = dashboard.shared.length > 1 && currentSwitchView() === "stage";
+  const isShown = groupedShared().length > 1 && currentSwitchView() === "stage";
   container.hidden = !isShown;
   if (!isShown) {
     container.innerHTML = "";
@@ -2387,7 +2630,7 @@ function routeInputFor(shared: SharedMonitorStatus, routeId: string): number | n
 
 /** Shared displays that switching everything to this host would change. */
 function switchAllTargets(routeId: string): SharedMonitorStatus[] {
-  return dashboard.shared.filter((shared) =>
+  return groupedShared().filter((shared) =>
     (selectedMonitorFor(shared)?.activeRoute ?? "local") !== routeId
     && routeInputFor(shared, routeId) != null
     && (shared.ddcAvailable || dashboard.agentConfigured));
@@ -2785,6 +3028,7 @@ async function bootstrap(): Promise<void> {
       await listen(HOST_APPEARANCES_CHANGED_EVENT, () => void reloadHostAppearances());
       await listen(INPUT_LABELS_CHANGED_EVENT, () => void reloadInputOptions());
       await listen(PEER_INPUTS_CHANGED_EVENT, () => void reloadPeerInputs());
+      await listen(HOST_GROUPS_CHANGED_EVENT, () => void reloadGroups());
       // A merge changes which displays exist and what they are called, which
       // only a full scan can work out, so this reloads everything.
       await listen(MONITOR_IDENTITIES_CHANGED_EVENT, () => void refresh());

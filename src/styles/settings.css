@@ -437,3 +437,20 @@
 .sub-tag.is-unreachable, .sub-tag.is-unchecked, .sub-tag.is-unreported { cursor: help; }
 .presence-line { cursor: help; white-space: nowrap; }
 .row-sub .presence-dot { position: static; margin-right: 4px; display: inline-block; vertical-align: 1px; border-width: 0; }
+
+/* Group editing: the name, then what the group covers. */
+.group-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-card);
+  background: var(--glass-weak);
+}
+.group-picks { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0; padding: 0; border: 0; }
+.group-picks legend { margin-bottom: 6px; padding: 0; color: var(--text-2); font-size: 12px; font-weight: 650; }
+.group-pick { display: flex; align-items: center; gap: 7px; color: var(--text); font-size: 13px; cursor: pointer; }
+.group-editor .section-hint { padding: 0; }
+.group-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
+/* Matches .row, so the empty state sits on the same margin as a list of rows. */
+.empty-hint { margin: 0; padding: 16px; color: var(--text-2); font-size: 13px; }
