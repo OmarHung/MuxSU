@@ -1833,7 +1833,7 @@ fn build_dashboard_state(state: &AppRuntime, app: &AppHandle) -> Result<Dashboar
         merge_suggestions,
         resolved_monitor_identities,
         local_host_name: state.local_host_name.clone(),
-        host_groups: settings.host_groups.clone(),
+        host_groups: groups_for_frontend(&settings),
         active_host_group_id: host_group_state(&settings).active_group_id,
     })
 }
@@ -4224,9 +4224,57 @@ struct HostGroupState {
     active_group_id: String,
 }
 
+/// The frontend draws this computer as the route "local" everywhere, while a
+/// group stores its discovery id — the only id that survives a rename. The
+/// two translate at the command boundary so neither side carries the other's
+/// spelling.
+const LOCAL_ROUTE_ID: &str = "local";
+
+fn group_for_frontend(group: &host_group::HostGroup, local_host_id: &str) -> host_group::HostGroup {
+    host_group::HostGroup {
+        host_ids: group
+            .host_ids
+            .iter()
+            .map(|id| {
+                if id == local_host_id {
+                    LOCAL_ROUTE_ID.to_owned()
+                } else {
+                    id.clone()
+                }
+            })
+            .collect(),
+        ..group.clone()
+    }
+}
+
+fn group_from_frontend(group: host_group::HostGroup, local_host_id: &str) -> host_group::HostGroup {
+    host_group::HostGroup {
+        host_ids: group
+            .host_ids
+            .iter()
+            .map(|id| {
+                if id == LOCAL_ROUTE_ID {
+                    local_host_id.to_owned()
+                } else {
+                    id.clone()
+                }
+            })
+            .collect(),
+        ..group
+    }
+}
+
+fn groups_for_frontend(settings: &AppSettings) -> Vec<host_group::HostGroup> {
+    settings
+        .host_groups
+        .iter()
+        .map(|group| group_for_frontend(group, &settings.local_host_id))
+        .collect()
+}
+
 fn host_group_state(settings: &AppSettings) -> HostGroupState {
     HostGroupState {
-        groups: settings.host_groups.clone(),
+        groups: groups_for_frontend(settings),
         active_group_id: host_group::active_group(
             &settings.host_groups,
             &settings.active_host_group,
@@ -4298,6 +4346,7 @@ fn save_host_group(
         },
         ..group
     };
+    let group = group_from_frontend(group, &settings.local_host_id);
     settings.host_groups =
         host_group::with_group(&settings.host_groups, group).map_err(group_error_text)?;
     let settings = store_settings(&state, settings)?;
@@ -7626,6 +7675,41 @@ mod tests {
             DestinationHost::Mac,
             None,
         )
+    }
+
+    #[test]
+    fn a_group_reaches_the_window_naming_this_computer_the_way_it_draws_routes() {
+        let group = host_group::HostGroup {
+            id: "g1".to_owned(),
+            name: "書房".to_owned(),
+            monitor_keys: Vec::new(),
+            host_ids: vec!["local-1".to_owned(), "peer-2".to_owned()],
+        };
+
+        let shown = group_for_frontend(&group, "local-1");
+
+        assert_eq!(
+            shown.host_ids,
+            vec!["local".to_owned(), "peer-2".to_owned()]
+        );
+    }
+
+    #[test]
+    fn a_group_saved_from_the_window_is_stored_by_discovery_id() {
+        let group = host_group::HostGroup {
+            id: "g1".to_owned(),
+            name: "書房".to_owned(),
+            monitor_keys: Vec::new(),
+            host_ids: vec!["local".to_owned(), "peer-2".to_owned()],
+        };
+
+        let stored = group_from_frontend(group, "local-1");
+
+        assert_eq!(
+            stored.host_ids,
+            vec!["local-1".to_owned(), "peer-2".to_owned()],
+            "the discovery id is what survives a rename"
+        );
     }
 
     #[test]

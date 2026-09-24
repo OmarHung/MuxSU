@@ -2,7 +2,7 @@ import { t, type MessageKey } from "./i18n";
 import { diagnosticsDialogsHtml, diagnosticsSectionHtml } from "./diagnostics";
 
 /** The settings sections, in tab-list order. */
-export const SETTINGS_TABS = ["displays", "hosts", "startup", "appearance", "experimental", "help", "reset"] as const;
+export const SETTINGS_TABS = ["displays", "hosts", "groups", "startup", "appearance", "experimental", "help", "reset"] as const;
 export type SettingsTab = typeof SETTINGS_TABS[number];
 
 interface TabSpec { id: SettingsTab; icon: string; label: MessageKey; countId?: string; danger?: boolean }
@@ -10,6 +10,7 @@ interface TabSpec { id: SettingsTab; icon: string; label: MessageKey; countId?: 
 const upperTabs: TabSpec[] = [
   { id: "displays", icon: "monitor", label: "settingsTab.displays", countId: "count-displays" },
   { id: "hosts", icon: "network", label: "settingsTab.hosts", countId: "count-hosts" },
+  { id: "groups", icon: "layers", label: "settingsTab.groups", countId: "count-groups" },
   { id: "startup", icon: "keyboard", label: "settingsTab.startup" },
   { id: "appearance", icon: "sun-moon", label: "settingsTab.appearance" },
 ];
@@ -86,6 +87,20 @@ function hostsTab(minSharedKeyLength: number): string {
           <input class="field-input" id="wait-seconds" type="number" min="5" max="120" />
         </label>
       </div>
+    </div>
+  </section>`;
+}
+
+function groupsTab(): string {
+  return `<section class="settings-tab" id="settings-tab-groups" data-settings-panel="groups">
+    ${tabHead("settingsTab.groups", "settingsTab.groupsBody")}
+    <div class="form-section">
+      <div class="group-head">
+        <h3 class="group-title">${t("settings.groupsTitle")}</h3>
+        <button class="button small" id="new-group-button" type="button"><i data-lucide="plus"></i><span>${t("action.newGroup")}</span></button>
+      </div>
+      <p class="section-hint">${t("settings.groupsHint")}</p>
+      <div class="list" id="group-list"></div>
     </div>
   </section>`;
 }
@@ -280,6 +295,7 @@ export function appShellHtml(options: { releaseRows: string; minSharedKeyLength:
             </div>
           </div>
         </div>
+        <div class="group-bar glass" id="group-bar" role="group" aria-label="${t("dashboard.groupAria")}" hidden></div>
         <div id="switch-panel"></div>
       </section>
       <section class="page" id="settings-page">
@@ -293,6 +309,7 @@ export function appShellHtml(options: { releaseRows: string; minSharedKeyLength:
           <form id="settings-form" class="settings-content">
             ${displaysTab()}
             ${hostsTab(options.minSharedKeyLength)}
+            ${groupsTab()}
             ${startupTab()}
             ${appearanceTab()}
             ${experimentalTab()}
