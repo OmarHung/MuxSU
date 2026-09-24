@@ -4,9 +4,10 @@
  * the app's own entry points, so nothing here ships.
  *
  * Query parameters:
- *   scenario = 2x2 (default) | 1x3 | 3x4 | 1x5 | empty | merge
- *   lang     = zh-TW | en
- *   theme    = light | dark
+ *   scenario     = 2x2 (default) | 1x3 | 3x4 | 1x5 | empty | merge
+ *   lang         = zh-TW | en
+ *   theme        = light | dark
+ *   experimental = on | off   the display actions that are off by default
  */
 
 type Platform = "windows" | "mac";
@@ -23,6 +24,11 @@ try {
   if (lang === "zh-TW" || lang === "en") localStorage.setItem("muxsu.locale", lang);
   const theme = params.get("theme");
   if (theme === "light" || theme === "dark") localStorage.setItem("muxsu.theme", theme);
+  // Stated rather than inherited, so a screenshot shows the same thing in a
+  // browser that once turned these on.
+  const experimental = params.get("experimental");
+  if (experimental === "on") localStorage.setItem("muxsu.experimental", "on");
+  else if (experimental === "off") localStorage.removeItem("muxsu.experimental");
   if (!params.has("view")) localStorage.removeItem("muxsu.switchView");
   else localStorage.setItem("muxsu.switchView", params.get("view") ?? "stage");
 } catch { /* Storage may be unavailable; the defaults still render. */ }
@@ -68,6 +74,27 @@ const inputLabels: Record<string, Record<number, string>> = { "demo-uw34": { [TY
 const hostAppearances: Record<string, { icon: string | null; color: string | null }> =
   scenario === "3x4" ? { "peer-nuc": { icon: "server", color: "green" } } : {};
 let hostOrder = [...routeIds];
+/** Demo groups, so the switch centre shows the group row. Only where there is
+ *  more than one display for a group to be a subset of. */
+const demoGroups = shape.displays >= 2
+  ? [
+      {
+        id: "group-desk",
+        name: isEnglish ? "Desk" : "書桌",
+        monitorKeys: [shared[0].key],
+        hostIds: ["local", ...peers.slice(0, 1).map((peer) => peer.id)],
+      },
+      {
+        id: "group-studio",
+        name: isEnglish ? "Studio" : "工作室",
+        // No hosts listed, which covers every host.
+        monitorKeys: shared.slice(1).map((display) => display.key),
+        hostIds: [],
+      },
+    ]
+  : [];
+let activeGroupId = "";
+const groupState = () => ({ groups: demoGroups, activeGroupId });
 
 function inputFor(displayKey: string, routeId: string): number | null {
   const value = portPlan[displayKey]?.[routeIds.indexOf(routeId)];
@@ -118,6 +145,8 @@ function dashboardState() {
       : [],
     resolvedMonitorIdentities: { ...identities(), [JSON.stringify(studioAtLowRes.fp)]: studioAtLowRes.key },
     localHostName: "DESKTOP-DEMO",
+    hostGroups: demoGroups,
+    activeHostGroupId: activeGroupId,
   };
 }
 
@@ -214,6 +243,26 @@ async function handle(command: string, args: Args): Promise<unknown> {
       activeRoute[String(args.monitorId)] = target;
       return { title: "已切換", detail: `已切換至 ${routeName(target)}`, peerWoken: false, warning: false };
     }
+    // Added in v0.8.0 and never taught to the demo, so the dashboard's first
+    // read got undefined back and threw on `.map`.
+    case "get_host_presence": case "refresh_host_presence":
+      return peers.map((peer) => ({
+        peerId: peer.id,
+        online: true,
+        checkedAtMs: Date.now(),
+        lastSeenAtMs: Date.now(),
+        attachedMonitors: shared.map((display) => display.key),
+        detail: "",
+      }));
+    case "get_host_groups": return groupState();
+    case "set_active_host_group": {
+      const wanted = String(args.groupId ?? "");
+      activeGroupId = demoGroups.some((group) => group.id === wanted) ? wanted : "";
+      return groupState();
+    }
+    // Editing a group is not what the screenshots show, so the demo takes the
+    // call and returns the groups it already has rather than growing a store.
+    case "save_host_group": case "remove_host_group": return groupState();
     case "check_for_update": return { available: false, currentVersion: "0.6.0", version: null, notes: null };
     case "check_host_switcher_shortcut": return { available: true, message: "快捷鍵可使用" };
     case "diagnostics_status": return { uploadAvailable: false };

@@ -50,6 +50,7 @@ You can share more than one monitor; each host stores its own input port for eac
 - With several shared monitors, one action sends all of them to the same host.
 - With many displays or hosts (3+ displays or 4+ hosts) the switch centre becomes a matrix — a row per display, a column per host. You can also change the view by hand.
 - A global shortcut can summon a small host picker even while the main window is hidden: number keys pick a host, Tab changes the target display.
+- When there are enough displays and computers that they do not all move together, group the ones that do. Choosing a group narrows the switch centre, the host switcher and the tray menu to it. Groups stay on this computer and are not shared with paired hosts.
 - The tray (the menu bar on macOS) switches too: every display to one host, or each display on its own.
 
 **Display maintenance (Re-seat signal is experimental)**
@@ -71,9 +72,9 @@ The computer names, addresses and display details shown below are anonymized sam
 
 ### Switch Center
 
-Which computer each shared monitor is currently handed to, and the input each one uses; the screen takes on the colour of the host it shows. With more than one shared monitor, a control at the top sends all of them to the same host at once.
+Which computer each shared monitor is currently handed to, and the input each one uses; the screen takes on the colour of the host it shows. With more than one shared monitor, a control at the top sends all of them to the same host at once. Once groups exist, a row of them appears under the heading, and choosing one shows only the displays and computers it covers.
 
-![MuxSU switch center with two shared monitors, one on this PC and one on the Mac](assets/screenshots/switch-center.en.png)
+![MuxSU switch center with a row of groups, two shared monitors, one on this PC and one on the Mac](assets/screenshots/switch-center.en.png)
 
 With more displays or hosts, the matrix view shows at a glance which host every display is on. Click any cell to switch it; "Switch all" above a column hands every display to that host.
 
@@ -90,6 +91,12 @@ Choosing shared monitors, this computer's port on each of them, and input notes.
 Added hosts and their inputs, other hosts found on the network, and the pairing password. The pencil next to a host renames it and changes its icon and colour.
 
 ![MuxSU Hosts & Pairing settings tab, choosing an icon and colour for the Mac mini](assets/screenshots/settings-hosts.en.png)
+
+### Settings › Groups
+
+Name the displays and computers you use together. Ticking nothing in either half covers all of that half. Groups stay on this computer and are not shared with paired hosts.
+
+![MuxSU Groups settings tab, two groups each covering one display](assets/screenshots/settings-groups.en.png)
 
 ## Before You Begin
 
